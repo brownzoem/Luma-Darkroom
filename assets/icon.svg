@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Luma Darkroom aperture sun</title>
+  <desc id="desc">A warm amber, coral, and violet aperture surrounded by sun rays on a deep charcoal field.</desc>
+  <defs>
+    <linearGradient id="field" x1="74" y1="48" x2="442" y2="468" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#291922"/>
+      <stop offset="0.55" stop-color="#171319"/>
+      <stop offset="1" stop-color="#101317"/>
+    </linearGradient>
+    <linearGradient id="orbit" x1="140" y1="126" x2="389" y2="397" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f7bd62"/>
+      <stop offset="0.5" stop-color="#e76661"/>
+      <stop offset="1" stop-color="#8d6bd8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(235 218) rotate(55) scale(224)">
+      <stop stop-color="#f39a55" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#d75b72" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#8d6bd8" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="aperture-disc">
+      <circle cx="256" cy="256" r="126"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="118" fill="url(#field)"/>
+  <circle cx="256" cy="256" r="211" fill="url(#glow)"/>
+
+  <g fill="none" stroke-linecap="round" stroke-width="17">
+    <path d="M256 64v34" stroke="#f7bd62"/>
+    <path d="M392 120l-24 24" stroke="#ef8a5e"/>
+    <path d="M448 256h-34" stroke="#e76661"/>
+    <path d="M392 392l-24-24" stroke="#cf5b7b"/>
+    <path d="M256 448v-34" stroke="#8d6bd8"/>
+    <path d="M120 392l24-24" stroke="#a866c7"/>
+    <path d="M64 256h34" stroke="#d15d89"/>
+    <path d="M120 120l24 24" stroke="#f09d59"/>
+  </g>
+
+  <circle cx="256" cy="256" r="150" fill="#21161d" stroke="url(#orbit)" stroke-width="13"/>
+  <g clip-path="url(#aperture-disc)">
+    <path d="M256 113c61 0 112 36 135 86l-103 29c-13-20-31-32-57-37Z" fill="#f7bd62"/>
+    <path d="M256 113c61 0 112 36 135 86l-103 29c-13-20-31-32-57-37Z" fill="#f09a58" transform="rotate(60 256 256)"/>
+    <path d="M256 113c61 0 112 36 135 86l-103 29c-13-20-31-32-57-37Z" fill="#e76661" transform="rotate(120 256 256)"/>
+    <path d="M256 113c61 0 112 36 135 86l-103 29c-13-20-31-32-57-37Z" fill="#ce597b" transform="rotate(180 256 256)"/>
+    <path d="M256 113c61 0 112 36 135 86l-103 29c-13-20-31-32-57-37Z" fill="#9b65c5" transform="rotate(240 256 256)"/>
+    <path d="M256 113c61 0 112 36 135 86l-103 29c-13-20-31-32-57-37Z" fill="#8d6bd8" transform="rotate(300 256 256)"/>
+  </g>
+  <circle cx="256" cy="256" r="51" fill="#171319" stroke="#f4ae61" stroke-width="8"/>
+  <circle cx="256" cy="256" r="13" fill="url(#orbit)"/>
+</svg>

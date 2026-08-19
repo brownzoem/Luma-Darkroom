@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' local-image: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self'; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Luma Darkroom</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo" aria-hidden="true"><img src="../assets/icon.png" alt=""></span><b>Luma</b><span>Darkroom</span><em>2</em></div>
+    <nav aria-label="Workspace"><button class="tab active" data-view="edit" aria-current="page">Develop</button><button class="tab" data-view="library">Library</button></nav>
+    <div class="head-actions"><button id="undoBtn" class="icon-btn" title="Undo" aria-label="Undo">↶</button><button id="redoBtn" class="icon-btn" title="Redo" aria-label="Redo">↷</button><button id="compareBtn" class="ghost" title="Hold for original" aria-pressed="false">◐ Before</button><button id="helpBtn" class="ghost help-button" title="Help (F1)" aria-haspopup="dialog">? Help</button><button id="exportBtn" class="primary" disabled>Export</button></div>
+  </header>
+  <main>
+    <aside class="left">
+      <button id="importBtn" class="import">＋ Import photos</button>
+      <div class="section-title">CATALOG</div>
+      <button class="side active" data-filter="all">▣ All Photos <span id="photoCount">0</span></button>
+      <button class="side" data-filter="picks">⚑ Picks</button>
+      <button class="side" data-filter="unrated">☆ Unrated</button>
+      <button class="side" data-filter="issues">⚠ Needs review <span id="issueCount">0</span></button>
+      <div class="section-title">WORKFLOW</div>
+      <button id="cullBtn" class="side" disabled>⌁ Analyze quality</button>
+      <button id="batchBtn" class="side" disabled>▤ Sync selected edits</button>
+      <button id="mergeBtn" class="side" disabled>◒ Merge selected</button>
+      <div class="section-title">CATALOG FILE</div>
+      <button id="backupBtn" class="new-album">⇩ Back up catalog</button>
+      <button id="restoreBtn" class="new-album">⇧ Restore catalog</button>
+      <div class="storage"><span>Local-first catalog</span><small>Originals and edits stay on this computer</small></div>
+    </aside>
+    <section class="workspace">
+      <div id="empty" class="empty">
+        <div class="empty-icon">◫</div><h1>Your digital darkroom.</h1><p>Import photographs to organize, develop, mask, and export. Originals remain untouched.</p>
+        <button id="emptyImport" class="primary large">Choose photos</button><div class="drop">or drag & drop anywhere</div>
+      </div>
+      <div id="editor" class="editor hidden">
+        <div class="canvas-wrap" id="canvasWrap"><div id="checker"><canvas id="canvas"></canvas><div id="maskOverlay" class="mask-overlay hidden"></div></div>
+          <div class="editor-tools"><button id="pickColorBtn" title="Pick a color from the photo" aria-pressed="false">⌖ Color</button><button id="focusModeBtn" title="Click the subject to position the mask" aria-pressed="false">◎ Focus</button><button id="cleanupModeBtn" title="Click blemishes or dust spots" aria-pressed="false">✦ Cleanup</button><span></span><button id="fitBtn">Fit</button><input id="zoomRange" aria-label="Zoom" type="range" min="25" max="200" value="100"><output id="zoomLabel" for="zoomRange">Fit</output></div>
+        </div>
+      </div>
+      <div id="library" class="library hidden">
+        <div class="library-head"><div><h1>All Photos</h1><p id="librarySubtitle">0 photographs</p><p id="libraryTarget" class="library-target">No active photograph</p></div><div class="library-actions"><input id="search" aria-label="Search photos" placeholder="Search names, tags…"><select id="filterRating" aria-label="Minimum rating"><option value="0">Any rating</option><option value="1">★ or better</option><option value="3">★★★ or better</option><option value="5">★★★★★ only</option></select><select id="sort" aria-label="Sort photos"><option value="newest">Newest first</option><option value="name">Name</option><option value="rating">Top rated</option><option value="quality">Quality</option></select></div></div>
+        <div id="selectionBar" class="selection-bar hidden"><b id="selectedCount">0 selected</b><button id="selectAllBtn">Select all</button><button id="deselectBtn">Clear</button><button id="compareSelectedBtn" disabled>Compare 2</button><button id="batchPresetBtn" disabled>Apply preset</button></div>
+        <div id="grid" class="grid"></div>
+        <div id="libraryMore" class="library-more hidden"><span id="libraryMoreText"></span><button id="loadMoreBtn" type="button">Load more</button></div>
+      </div>
+      <div id="filmstrip" class="filmstrip hidden"></div>
+    </section>
+    <aside id="adjustPanel" class="right hidden">
+      <div class="histogram"><canvas id="hist" width="304" height="92"></canvas><div class="clip-label"><span>SHADOWS</span><span>HIGHLIGHTS</span></div></div>
+      <div class="panel-tabs" role="tablist" aria-label="Editing panels"><button id="editPanelTab" class="active" data-panel="edit" role="tab" aria-selected="true" aria-controls="editPanel">Edit</button><button id="presetsPanelTab" data-panel="presets" role="tab" aria-selected="false" aria-controls="presets">Presets</button><button id="maskPanelTab" data-panel="mask" role="tab" aria-selected="false" aria-controls="maskPanel">Mask</button></div>
+      <div id="editPanel" role="tabpanel" aria-labelledby="editPanelTab"><div id="adjustments"></div></div>
+      <div id="presets" class="presets-panel hidden" role="tabpanel" aria-labelledby="presetsPanelTab"><div class="preset-top"><input id="presetSearch" aria-label="Search presets" placeholder="Search presets"><label for="presetAmount">Amount <output id="presetAmountOut" for="presetAmount">100</output></label><input id="presetAmount" aria-label="Preset amount" type="range" min="0" max="200" value="100"></div><div id="presetGroups" class="preset-groups"></div><div id="presetGrid" class="presets"></div></div>
+      <div id="maskPanel" class="hidden" role="tabpanel" aria-labelledby="maskPanelTab"><div class="mask-intro"><b>Local masks</b><p>Use offline adjustable masks. Click the image to position focus or cleanup.</p></div><div id="maskControls"></div></div>
+      <div class="bottom-tools"><button id="rotateLeft">↶ 90°</button><button id="rotateRight">↷ 90°</button><button id="flipBtn">⇆ Flip</button><button id="resetBtn">Reset</button></div>
+    </aside>
+  </main>
+
+  <dialog id="metadataDialog" aria-labelledby="metadataTitle"><form method="dialog"><header><h2 id="metadataTitle">Photo info</h2><button value="cancel" aria-label="Close Photo info">×</button></header><div class="field-label" id="ratingLabel">Rating</div><div id="ratingEditor" class="stars" role="group" aria-labelledby="ratingLabel"></div><label>Flag<select id="flagEditor"><option value="none">Unflagged</option><option value="pick">Pick</option><option value="reject">Rejected</option></select></label><label>Color label<select id="labelEditor"><option value="">None</option><option value="red">Red</option><option value="yellow">Yellow</option><option value="green">Green</option><option value="blue">Blue</option><option value="purple">Purple</option></select></label><label>Keywords<input id="tagsEditor" placeholder="portrait, travel, client"></label><label>Caption<textarea id="captionEditor" rows="3"></textarea></label><button id="saveMetadata" value="default" class="primary">Save metadata</button></form></dialog>
+  <dialog id="exportDialog" aria-labelledby="exportTitle"><form method="dialog"><header><h2 id="exportTitle">Export photograph</h2><button value="cancel" aria-label="Close Export photograph">×</button></header><p id="exportTarget" class="dialog-target"></p><div class="two-col"><label>Format<select id="exportFormat"><option value="jpg">JPEG</option><option value="png">PNG</option><option value="webp">WebP</option><option value="tiff">TIFF</option><option value="original">Original file</option></select></label><label id="exportQualityField">Quality<input id="exportQuality" type="number" min="10" max="100" value="92" required></label><label id="exportSizeField">Long edge<input id="exportSize" type="number" min="0" max="16384" step="1" value="0" required><small>0 keeps full resolution</small></label><label id="exportWatermarkField">Watermark<input id="exportWatermark" list="watermarkHistory" maxlength="80" placeholder="Optional text"><datalist id="watermarkHistory"></datalist><small>Recent watermarks are remembered locally</small></label></div><p id="exportFormatNote" class="guide-status hidden"></p><button id="doExport" value="default" class="primary">Export</button></form></dialog>
+  <dialog id="mergeDialog" aria-labelledby="mergeTitle"><form method="dialog"><header><h2 id="mergeTitle">Merge selected photos</h2><button value="cancel" aria-label="Close Merge selected photos">×</button></header><p>Use two or more selected photographs.</p><button id="hdrMerge" value="default" class="merge-option"><b>HDR blend</b><span>Average exposures for wider tonal detail</span></button><button id="panoMerge" value="default" class="merge-option"><b>Panorama strip</b><span>Arrange photographs horizontally with overlap</span></button></form></dialog>
+  <dialog id="compareDialog" class="compare-dialog" aria-labelledby="compareTitle"><form method="dialog"><header><div><h2 id="compareTitle">Compare photographs</h2><small>Rendered with each photo’s current edits</small></div><button value="cancel" aria-label="Close Compare photographs">×</button></header><div class="compare-grid"><figure><canvas id="compareCanvasA"></canvas><figcaption id="compareNameA"></figcaption></figure><figure><canvas id="compareCanvasB"></canvas><figcaption id="compareNameB"></figcaption></figure></div></form></dialog>
+  <dialog id="restoreConfirmDialog" aria-labelledby="restoreConfirmTitle" aria-describedby="restoreConfirmSummary"><form method="dialog"><header><h2 id="restoreConfirmTitle">Review catalog restore</h2><button value="cancel" aria-label="Close Restore preview">×</button></header><p id="restoreConfirmSummary"></p><p class="restore-warning">Before replacing the catalog, Luma will ask you to save a full backup of the current catalog. Canceling that backup cancels the restore.</p><div class="dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="restore" class="primary">Back up &amp; restore</button></div></form></dialog>
+  <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle" aria-describedby="helpIntro">
+    <form method="dialog">
+      <header><div><div class="dialog-kicker">LUMA DARKROOM 2.1.0</div><h2 id="helpTitle">Help Center</h2></div><button value="cancel" aria-label="Close Help Center">×</button></header>
+      <p id="helpIntro" class="help-intro">Learn the workflow, review shortcuts, or open the installation and user guide.</p>
+      <div class="help-actions">
+        <button id="startTutorialBtn" type="button" class="primary">Start interactive tutorial</button>
+        <button id="openGuideBtn" type="button" class="ghost">Installation &amp; user guide ↗</button>
+      </div>
+      <p id="guideStatus" class="guide-status hidden" role="status" aria-live="polite"></p>
+      <section class="help-section" aria-labelledby="shortcutsTitle">
+        <h3 id="shortcutsTitle">Keyboard shortcuts</h3>
+        <div class="shortcut-grid">
+          <span>Open Help</span><kbd>F1</kbd>
+          <span>Undo / Redo</span><kbd>Ctrl Z / Ctrl Shift Z</kbd>
+          <span>Export</span><kbd>Ctrl E</kbd>
+          <span>Library / Develop</span><kbd>G / D</kbd>
+          <span>Previous / Next photo</span><kbd>← / →</kbd>
+          <span>Set rating</span><kbd>0–5</kbd>
+          <span>Pick / Reject / Clear flag</span><kbd>P / X / U</kbd>
+          <span>Show original</span><kbd>Hold \</kbd>
+          <span>Close dialog or tool</span><kbd>Esc</kbd>
+        </div>
+      </section>
+      <section class="help-section about-block" aria-labelledby="aboutTitle">
+        <h3 id="aboutTitle">About</h3>
+        <p><b>Luma Darkroom 2.1.0</b> is a local-first, non-destructive photo editor. Your originals and edit catalog stay on this computer unless you export or back them up.</p>
+        <details><summary>Open-source notices</summary><p>Luma Darkroom application code is provided under the MIT License. It is built with Electron (MIT License), sharp (Apache-2.0 License), and native image libraries that include components under the GNU LGPLv3 and Mozilla Public License 2.0. Complete copyright notices, license texts, source locations, and library-replacement guidance are included under <b>resources/licenses</b> in the installation and alongside each release. Copyright remains with each project’s contributors.</p></details>
+      </section>
+    </form>
+  </dialog>
+  <dialog id="tutorialDialog" class="tutorial-dialog" aria-labelledby="tutorialTitle" aria-describedby="tutorialCopy">
+    <div class="tutorial-card">
+      <div class="tutorial-topline"><span id="tutorialStepLabel">STEP 1 OF 6</span><button id="tutorialClose" type="button" aria-label="Skip tutorial">×</button></div>
+      <div id="tutorialProgress" class="tutorial-progress" aria-hidden="true"></div>
+      <h2 id="tutorialTitle">Welcome to Luma Darkroom</h2>
+      <p id="tutorialCopy" aria-live="polite">A quick tour will show you where to import, organize, edit, and export your photographs.</p>
+      <p id="tutorialHint" class="tutorial-hint"></p>
+      <div class="tutorial-actions">
+        <button id="tutorialSkip" type="button" class="tutorial-skip">Skip tour</button>
+        <span></span>
+        <button id="tutorialBack" type="button" class="ghost">Back</button>
+        <button id="tutorialNext" type="button" class="primary">Next</button>
+      </div>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <script src="engine.js"></script><script src="app.js"></script>
+</body>
+</html>

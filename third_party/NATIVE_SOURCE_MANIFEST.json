@@ -1,0 +1,103 @@
+{
+  "release": "2.1.0",
+  "platformPayload": "@img/sharp-win32-x64@0.35.3",
+  "nativeInventory": "third_party/SHARP-WIN32-X64-VERSIONS.json",
+  "sources": [
+    {
+      "component": "FriBidi",
+      "version": "1.0.16",
+      "file": "fribidi-1.0.16.tar.gz",
+      "url": "https://codeload.github.com/fribidi/fribidi/tar.gz/refs/tags/v1.0.16",
+      "bytes": 2144176,
+      "sha256": "5a1d187a33daa58fcee2ad77f0eb9d136dd6fa4096239199ba31e850d397e8a8"
+    },
+    {
+      "component": "GLib",
+      "version": "2.89.0",
+      "file": "glib-2.89.0.tar.xz",
+      "url": "https://download.gnome.org/sources/glib/2.89/glib-2.89.0.tar.xz",
+      "bytes": 5800196,
+      "sha256": "205bf5dab175de68f11e33be7bb36d4ad4c5a5097d8c0c88a8682b257b6293dc"
+    },
+    {
+      "component": "libexif",
+      "version": "0.6.26",
+      "file": "libexif-0.6.26.tar.gz",
+      "url": "https://codeload.github.com/libexif/libexif/tar.gz/refs/tags/v0.6.26",
+      "bytes": 1314654,
+      "sha256": "32e591455339504b7d02f3e9b0a48f16f5455462a9059a7f47639980e82e4bc1"
+    },
+    {
+      "component": "libheif",
+      "version": "1.23.0",
+      "file": "libheif-1.23.0.tar.gz",
+      "url": "https://codeload.github.com/strukturag/libheif/tar.gz/refs/tags/v1.23.0",
+      "bytes": 2017733,
+      "sha256": "50ea4fbd1e19c7b8820271d6d0c73f2623fec5d659ce9fae57e48dbeb94fab9a"
+    },
+    {
+      "component": "librsvg",
+      "version": "2.62.3",
+      "file": "librsvg-2.62.3.tar.xz",
+      "url": "https://download.gnome.org/sources/librsvg/2.62/librsvg-2.62.3.tar.xz",
+      "bytes": 6760876,
+      "sha256": "7eb449b2722a768021356f66dfee3202c229b54ed4e6a70ce40c090e97ff16f2"
+    },
+    {
+      "component": "libvips",
+      "version": "8.18.3",
+      "file": "libvips-8.18.3.tar.gz",
+      "url": "https://codeload.github.com/libvips/libvips/tar.gz/refs/tags/v8.18.3",
+      "bytes": 27964126,
+      "sha256": "21aa79be2a83f1f46582c58e0fc7fc2b355e6fbb661091fb963a3b20f494dbaf"
+    },
+    {
+      "component": "Pango",
+      "version": "1.57.1",
+      "file": "pango-1.57.1.tar.xz",
+      "url": "https://download.gnome.org/sources/pango/1.57/pango-1.57.1.tar.xz",
+      "bytes": 2588416,
+      "sha256": "e65d6d117080dc3aeeb7d8b4b3b518f7383aa2e6cfce23117c623cd624764c2f"
+    },
+    {
+      "component": "proxy-libintl",
+      "version": "0.5",
+      "file": "proxy-libintl-0.5.tar.gz",
+      "url": "https://codeload.github.com/frida/proxy-libintl/tar.gz/refs/tags/0.5",
+      "bytes": 13056,
+      "sha256": "f7a1cbd7579baaf575c66f9d99fb6295e9b0684a28b095967cfda17857595303"
+    },
+    {
+      "component": "Cairo",
+      "version": "1.18.4",
+      "file": "cairo-1.18.4.tar.xz",
+      "url": "https://cairographics.org/releases/cairo-1.18.4.tar.xz",
+      "bytes": 32578804,
+      "sha256": "445ed8208a6e4823de1226a74ca319d3600e83f6369f99b14265006599c32ccb"
+    },
+    {
+      "component": "Windows build recipes",
+      "version": "bca68727eb1df12c5d2b204a13a392989d505774",
+      "file": "build-win64-mxe-bca68727.tar.gz",
+      "url": "https://codeload.github.com/libvips/build-win64-mxe/tar.gz/bca68727eb1df12c5d2b204a13a392989d505774",
+      "bytes": 76984,
+      "sha256": "01d63c45d5406b80c38cc4fc5e8a0630a5eeac2e45fae2c676979a4cb1d365fd"
+    },
+    {
+      "component": "Native packaging recipes",
+      "version": "a2d035c4b72d8f33942c2dfa8e020e49fcacc0dc",
+      "file": "sharp-libvips-a2d035c4.tar.gz",
+      "url": "https://codeload.github.com/lovell/sharp-libvips/tar.gz/a2d035c4b72d8f33942c2dfa8e020e49fcacc0dc",
+      "bytes": 23933,
+      "sha256": "cab8a652dc49e02bd5df89ba1ce30075949f4f5943de9bd425d05535f63e07eb"
+    },
+    {
+      "component": "sharp",
+      "version": "0.35.3",
+      "file": "sharp-0.35.3.tar.gz",
+      "url": "https://codeload.github.com/lovell/sharp/tar.gz/refs/tags/v0.35.3",
+      "bytes": 41784306,
+      "sha256": "0217f802064e589131536bdac8d1beb5b8a40953d1f066771204a0e5956750e6"
+    }
+  ]
+}

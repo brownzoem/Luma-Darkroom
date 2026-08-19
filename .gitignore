@@ -1,0 +1,49 @@
+# Dependencies and package-manager state
+node_modules/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build and release artifacts
+outputs/
+dist/
+release/
+*.blockmap
+*.exe
+*.msi
+*.dmg
+*.AppImage
+
+# Test and coverage output
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Local work and caches
+work/
+.cache/
+.electron/
+*.log
+*.tmp
+*.luma-tmp
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini

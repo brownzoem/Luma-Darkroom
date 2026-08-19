@@ -1,0 +1,62 @@
+name: Feature request
+description: Propose an outcome that fits the local-first photo workflow
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explain the user problem before the implementation. Roadmap entries are not commitments.
+        Do not submit proprietary presets, profiles, artwork, or branding.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is difficult today, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior without requiring a particular architecture.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Primary area
+      options:
+        - Import and file support
+        - Library and culling
+        - Develop and color
+        - Masks and cleanup
+        - Catalog durability
+        - Export and interoperability
+        - Performance
+        - Accessibility
+        - Documentation or contributor tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Data, privacy, performance, and security effects
+      description: Note network use, new stored data, migrations, resource bounds, and source-file risk.
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Project fit
+      options:
+        - label: The proposal keeps original photographs non-destructive.
+          required: true
+        - label: Any network or telemetry behavior is explicitly disclosed.
+          required: true
+        - label: The proposal does not rely on third-party affiliation or proprietary third-party assets.
+          required: true

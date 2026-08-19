@@ -1,0 +1,91 @@
+name: Bug report
+description: Report a reproducible problem in Luma Darkroom
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Back up important catalogs and originals first.
+        Do not attach private photographs, catalogs, crash dumps, credentials, usernames, or full paths.
+        Security vulnerabilities must use the private process in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Luma Darkroom version
+      description: Include whether this is a packaged installer or a source checkout.
+      placeholder: "2.1.0, packaged Windows build"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and architecture
+      placeholder: "Windows 11, x64"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Startup or installer
+        - Import or decoding
+        - Library or culling
+        - Develop controls or preview
+        - Masks or cleanup
+        - Catalog, autosave, backup, or restore
+        - Compare, merge, or analysis
+        - Export
+        - Accessibility or keyboard workflow
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use a disposable or synthetic image where possible.
+      placeholder: |
+        1. Start with...
+        2. Import...
+        3. Change...
+        4. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source format and approximate dimensions
+      description: Do not provide a real filename or path.
+      placeholder: "JPEG, about 6000 x 4000"
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Remove image metadata, usernames, paths, tokens, and personal content.
+      render: text
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I reproduced this on the latest supported release or current source.
+          required: true
+        - label: I preserved my originals and made a catalog backup where possible.
+          required: true
+        - label: This report contains no vulnerability details or private data.
+          required: true

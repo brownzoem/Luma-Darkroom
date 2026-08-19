@@ -1,0 +1,110 @@
+{
+  "name": "luma-darkroom",
+  "version": "2.1.0",
+  "description": "A local-first, non-destructive desktop photo workspace",
+  "main": "electron/main.js",
+  "author": "Luma Darkroom contributors",
+  "license": "MIT",
+  "homepage": "https://lumadarkroom.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brownzoem/Luma-Darkroom.git"
+  },
+  "bugs": {
+    "url": "https://github.com/brownzoem/Luma-Darkroom/issues"
+  },
+  "keywords": [
+    "photo-editor",
+    "non-destructive-editing",
+    "electron",
+    "open-source"
+  ],
+  "scripts": {
+    "build:icons": "node scripts/build-icons.js",
+    "build:native-source": "node scripts/build-native-source-bundle.js",
+    "build:notices": "node scripts/build-notice-bundle.js",
+    "check:syntax": "node --check electron/main.js && node --check electron/preload.js && node --check src/engine.js && node --check src/render-worker.js && node --check src/app.js",
+    "test:smoke": "node tests/e2e-smoke.js",
+    "test:regression": "node tests/e2e-regression.js",
+    "test:resilience": "node tests/e2e-resilience.js",
+    "test:export-worker": "node tests/e2e-export-worker.js",
+    "test:packaged": "node tests/packaged-smoke.js",
+    "test": "npm run check:syntax && npm run test:smoke && npm run test:regression && npm run test:resilience && npm run test:export-worker",
+    "verify:notices": "node scripts/fetch-upstream-notices.js --check",
+    "verify:notices:upstream": "node scripts/fetch-upstream-notices.js --check-upstream",
+    "verify:release": "node scripts/verify-windows-release.js",
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "@electron/asar": "^3.4.1",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.0.12",
+    "playwright-core": "^1.62.1"
+  },
+  "build": {
+    "appId": "com.luma.darkroom",
+    "productName": "Luma Darkroom",
+    "directories": {
+      "output": "outputs/release"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "assets/icon.png",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "licenses/LUMA-DARKROOM-MIT.txt"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "licenses/THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "node_modules/sharp/LICENSE",
+        "to": "licenses/sharp/Apache-2.0.txt"
+      },
+      {
+        "from": "node_modules/@img/sharp-win32-x64/LICENSE",
+        "to": "licenses/sharp-win32-x64/Apache-2.0.txt"
+      },
+      {
+        "from": "node_modules/@img/sharp-win32-x64/README.md",
+        "to": "licenses/sharp-win32-x64/NATIVE-LIBRARY-NOTICES.md"
+      },
+      {
+        "from": "node_modules/@img/colour/LICENSE.md",
+        "to": "licenses/colour/LICENSES.md"
+      },
+      {
+        "from": "third_party",
+        "to": "licenses/third_party",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Luma-Darkroom-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "license": "LICENSE",
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "sharp": "^0.35.3"
+  }
+}

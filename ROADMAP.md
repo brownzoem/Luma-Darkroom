@@ -12,19 +12,24 @@ review, maintenance constraints, or contributor feedback.
 - Improve missing-file relinking without discarding edits or metadata.
 - Make catalog diagnostics, recovery source, storage use, and backup state
   visible to users.
-- Strengthen accessibility, focus order, keyboard operation, and contrast.
+- Continue accessibility audits beyond the keyboard canvas, tone-curve, focus,
+  contrast, responsive-reflow, and 400%-zoom coverage added in 2.2.0.
 - Validate more source formats with clear codec-specific errors.
 
 ## Next: durable and scalable editing
 
-- Move expensive preview and histogram work away from the UI thread.
+- Move histogram analysis away from the UI thread and continue reducing
+  redundant preview work.
 - Add bounded thumbnail and preview caches with explicit rebuild controls.
 - Evaluate a transactional catalog backend and sidecar export while preserving
   import compatibility with the current JSON catalog.
 - Add interactive crop handles and a normalized geometry model shared by
   preview and export.
-- Add manual brush, radial, and linear-gradient masks with independent IDs,
-  feathering, add/subtract/intersect, and cached rasterization.
+- Improve local selection with optional on-device semantic models, finer edge
+  maps, reusable cached masks, intersect/group operations, and explicit
+  before/after mask comparison.
+- Improve healing with better texture synthesis, source previews, repair-list
+  editing, and high-resolution edge fidelity.
 - Add a background export queue with cancel, retry, progress, and saved recipes.
 - Add two-up synchronized pan/zoom and a multi-photo survey view.
 

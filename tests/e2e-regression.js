@@ -15,6 +15,16 @@ let fixtures;
   await page.evaluate(paths=>{photos=paths.map((filePath,i)=>E.migratePhoto({id:`stress-${i}`,filePath,name:filePath.split('\\').pop(),importedAt:Date.now()-i,rating:i,flag:'none',tags:[],caption:''}));updateLibrary();selectPhoto(photos[0])},samples);
   await page.waitForFunction(()=>canvas.width>500);
 
+  const presetStart=await page.evaluate(()=>{current.edits=E.defaultEdits();current.edits.light.exposure=.37;current.edits.geometry.rotate=7;clearPresetTracking();refreshControls();scheduleRender();return E.clone(current.edits)});
+  await page.click('.panel-tabs [data-panel="presets"]');
+  await page.click('.preset[data-name="Classic B&W"]');
+  const presetSwitch={bwApplied:await page.evaluate(()=>current.edits.bw)};
+  await page.click('.preset[data-name="Clean Natural"]');
+  Object.assign(presetSwitch,await page.evaluate(start=>{const colorPreset=presets.find(p=>p.name==='Clean Natural'),expected=blendPreset(start,resolvedPresetPatch(colorPreset),1);return{bwAfterColor:current.edits.bw,curvePointsAfterColor:current.edits.curve.rgb.length,highlightGradeAfterColor:current.edits.grading.highlights.saturation,exposurePreserved:current.edits.light.exposure,geometryPreserved:current.edits.geometry.rotate,exactReplacement:JSON.stringify(current.edits)===JSON.stringify(expected)}},presetStart));
+  await page.evaluate(start=>{current.edits=E.clone(start);clearPresetTracking();undoByPhoto.set(current.id,[]);redoByPhoto.set(current.id,[]);refreshControls();scheduleRender()},presetStart);
+  await page.click('.panel-tabs [data-panel="edit"]');
+  if(!presetSwitch.bwApplied||presetSwitch.bwAfterColor||presetSwitch.curvePointsAfterColor!==2||presetSwitch.highlightGradeAfterColor!==0||presetSwitch.exposurePreserved!==.37||presetSwitch.geometryPreserved!==7||!presetSwitch.exactReplacement)errors.push(`Preset switching layered prior preset: ${JSON.stringify(presetSwitch)}`);
+
   const controls=await page.evaluate(()=>{const failures=[];for(const el of document.querySelectorAll('input[data-path]')){const min=+el.min,max=+el.max,target=+(min+(max-min)*.63).toFixed(el.step.includes('.')?2:0);el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));el.value=target;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));const actual=getPath(current.edits,el.dataset.path);if(Math.abs(actual-target)>Math.max(.011,+el.step/2+.001))failures.push({path:el.dataset.path,target,actual})}return{count:document.querySelectorAll('input[data-path]').length,failures}});
   await page.waitForTimeout(500);
   const checks=await page.evaluate(()=>{const failures=[];for(const el of document.querySelectorAll('input[data-check-path]')){const before=!!getPath(current.edits,el.dataset.checkPath);el.click();const actual=!!getPath(current.edits,el.dataset.checkPath);if(actual===before)failures.push(el.dataset.checkPath)}return{count:document.querySelectorAll('input[data-check-path]').length,failures}});
@@ -51,6 +61,6 @@ let fixtures;
   const overlap=await page.evaluate(()=>{const bad=[];for(const el of document.querySelectorAll('button,input,select')){const s=getComputedStyle(el),r=el.getBoundingClientRect();if(s.display==='none'||s.visibility==='hidden'||r.width===0||r.height===0||r.bottom<0||r.top>innerHeight)continue;const top=document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,r.left+r.width/2)),Math.max(0,Math.min(innerHeight-1,r.top+r.height/2)));if(top&&!el.contains(top)&&!top.contains(el))bad.push({id:el.id||el.className,coveredBy:top.id||top.className})}return bad});
   const security=await page.evaluate(()=>{const p=E.migratePhoto({id:'\"><img src=x onerror=alert(1)>',filePath:'C:\\fake.jpg',name:'<script>bad()</script>',rating:99,flag:'evil',label:'\" onclick=alert(1)',tags:['ok',42],caption:'x'});return{requireType:typeof require,processType:typeof process,label:p.label,flag:p.flag,rating:p.rating,tags:p.tags,name:p.name,csp:document.querySelector('meta[http-equiv="Content-Security-Policy"]').content,popup:window.open('https://example.com')===null}});
   if(security.requireType!=='undefined'||security.processType!=='undefined'||security.label||security.flag!=='none'||security.rating!==5||security.tags.length!==1||!security.popup)errors.push('Renderer security invariant failed');
-  const report={controls,checks,selectState,curvePoints:curve.length,batch,compareState,shortcutMarked,watermarks,overlap,security,errors};
+  const report={presetSwitch,controls,checks,selectState,curvePoints:curve.length,batch,compareState,shortcutMarked,watermarks,overlap,security,errors};
   process.stdout.write(JSON.stringify(report,null,2));await app.close();await fixtures.cleanup();if(controls.failures.length||checks.failures.length||errors.length)process.exitCode=1;
 })().catch(async e=>{console.error(e);await fixtures?.cleanup();process.exitCode=1});

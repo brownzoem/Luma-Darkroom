@@ -3,7 +3,7 @@
 ## Purpose and assumptions
 
 This document records intended trust boundaries and known limitations of the
-2.1.0 codebase. It helps reviewers reason about changes; it is not a formal
+2.2.0 codebase. It helps reviewers reason about changes; it is not a formal
 audit, proof, certification, warranty, or legal guarantee.
 
 The model assumes:
@@ -114,7 +114,8 @@ accept a renderer-specified arbitrary destination path.
 - Records and edit keys are whitelisted and normalized.
 - Prototype-related keys and unknown edit properties are ignored.
 - Non-finite and extreme values are replaced or bounded.
-- Strings, tags, curve points, cleanup points, history, and caches are capped.
+- Strings, tags, curve points, mask layers/strokes, retouch points, history,
+  workers, and caches are capped.
 - Duplicate paths are skipped and duplicate IDs are replaced.
 - A completely unreadable catalog is preserved rather than autosaved as empty.
 - Restore happens in memory only after complete validation.

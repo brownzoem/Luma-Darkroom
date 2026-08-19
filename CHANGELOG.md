@@ -5,6 +5,48 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+## 2.2.0 - 2026-08-19
+
+### Added
+
+- A non-destructive local-mask stack with independent object, sky, brush,
+  linear-gradient, and radial-gradient layers; reorder, rename, duplicate,
+  visibility, invert, opacity, overlay, and add/subtract refinement controls.
+- Dedicated dodge and burn brushes with flow, tone-range, and protect-tones
+  controls.
+- Bounded spot-heal, source-and-target clone, and red-eye correction tools
+  whose coordinates remain attached to the photograph through geometry edits.
+- Persistent on-canvas gradient guides and brush-size feedback.
+- Keyboard operation for canvas tools and tone curves, visible keyboard
+  cursors, and content reachability at 400% application zoom.
+
+### Changed
+
+- Replaced the fixed oval focus selection with bounded connected-image
+  analysis plus manual refinement.
+- Moved interactive previews to a coalescing background worker with timeout,
+  recovery, and zoom-aware settled resolution.
+- Made consecutive presets replace the prior preset recipe while preserving
+  pre-preset manual edits; color presets now reliably leave monochrome mode.
+- Corrected preset curve amount blending, amount undo/redo, negative color-
+  mixer hue migration, zero-feather brush painting, and mask geometry
+  anchoring across every rotate-and-flip combination.
+- Changed converted TIFF, AVIF, HEIF/HEIC, and camera-file handoff from a lossy
+  JPEG intermediate to lossless 8-bit PNG with a decoded-buffer limit.
+- Preserved the rendered shape and repair behavior of version 2 masks and
+  cleanup records when older catalogs are opened.
+
+### Reliability
+
+- Bounded mask layers, strokes, analysis maps, retouch records, preview jobs,
+  and decoded conversion buffers to reduce runaway memory use and stale work.
+- Clipped repair work buffers to the visible output intersection so malformed
+  catalog radii cannot request multi-gigabyte temporary canvases.
+- Added layered-mask, preset-switch, conversion-fidelity, preview-latency,
+  zoom-resolution, frozen legacy-render, source-space geometry, transform-
+  matrix, hostile-input, keyboard-tool, 400%-zoom, and responsive-layout
+  regression coverage.
+
 ## 2.1.0 - 2026-08-18
 
 ### Added

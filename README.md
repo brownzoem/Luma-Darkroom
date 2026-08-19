@@ -18,8 +18,13 @@ Project website and user guide: <https://lumadarkroom.com>
 - Non-destructive develop controls for profiles, light, tone curves, white
   balance, vibrance, saturation, an eight-channel color mixer, point color,
   color grading, effects, detail, optics, and geometry.
-- Adjustable local subject/sky-style masks, focus blur, and bounded spot
-  cleanup. These are offline heuristic tools, not semantic cloud AI.
+- A non-destructive stack of up to eight independent object, sky, brush,
+  linear-gradient, and radial-gradient masks. Layers can be reordered,
+  renamed, hidden, inverted, duplicated, refined with add/subtract brushes,
+  and blended with per-mask opacity.
+- Local exposure, color, clarity, blur, dodge, and burn controls plus bounded
+  spot healing, clone sampling, and red-eye correction. Object and sky
+  selections are offline heuristics, not semantic cloud AI.
 - Curated color, portrait, landscape, cinematic, film, black-and-white, and
   HDR-style presets with an amount control.
 - Before/original comparison, two-photo comparison, a filmstrip, zoom, rotate,
@@ -49,6 +54,10 @@ Shortcuts are ignored while typing in a field or while a dialog is open.
 | Hold original | Backslash |
 | Undo / redo | Ctrl or Cmd + Z / Shift + Ctrl or Cmd + Z |
 | Open export | Ctrl or Cmd + E |
+| Open Help Center | F1 |
+| Move the active canvas tool cursor | Arrow keys; hold Shift for larger steps |
+| Apply the active canvas tool | Enter or Space |
+| Add / select / move / delete a tone-curve point | Enter / Ctrl + Left or Right / Arrow keys / Delete |
 
 ## Install
 
@@ -80,6 +89,7 @@ not code-signed. See [Releasing](docs/RELEASING.md) before distributing a build.
 | **electron/preload.js** | Narrow context-bridge API exposed to the renderer |
 | **src/app.js** | Catalog, UI, culling workflow, autosave, presets, and renderer orchestration |
 | **src/engine.js** | Edit schema, migration, geometry, pixel processing, analysis, and canvas export |
+| **src/preview-worker.js** | Coalesced background preview rendering with watchdog recovery |
 | **src/render-worker.js** | Background full-size render, encoding, progress, and cancellation |
 | **src/index.html** | Static interface and Content Security Policy |
 | **src/styles.css** | Desktop UI presentation |
@@ -108,7 +118,12 @@ paths and metadata. See [Privacy](docs/PRIVACY.md).
 - Full-resolution canvas processing is bounded to reduce out-of-memory crashes.
   Very large photographs or panoramas may require a smaller export size.
 - Camera-file decoding is best effort. Unsupported or damaged files remain in
-  the catalog but may not render.
+  the catalog but may not render. Converted sources use a lossless 8-bit PNG
+  handoff, which avoids an extra lossy encode but does not preserve a full
+  scene-referred RAW workflow or every source bit depth and metadata field.
+- Object/sky selection uses bounded local image analysis. Fine hair,
+  translucent edges, and complex similarly colored backgrounds can require
+  manual add/subtract refinement.
 - Rendering is an sRGB-oriented Canvas 2D pipeline, not a full camera-profile,
   scene-referred RAW, or print color-management system.
 - The local catalog is browser storage rather than a multi-user database. It

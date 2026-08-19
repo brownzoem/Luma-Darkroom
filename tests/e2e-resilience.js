@@ -207,23 +207,21 @@ async function livePage(app) {
     return { trackingCleared: activePreset === null && presetBase === null, beforeAmountMove, afterAmountMove: current.edits.light.exposure };
   });
 
-  // Activating Focus changes edit state and therefore must autosave and be undoable.
+  // Creating and placing an object mask are separate undoable edits. The new
+  // layer must remain inactive until the user chooses a source point.
   await page.evaluate(() => {
     catalogDirty = false;
-    current.edits.mask.enabled = false;
-    current.edits.mask.type = 'subject';
+    current.edits.masks = { activeId: '', layers: [] };
     undoByPhoto.set(current.id, []);
     redoByPhoto.set(current.id, []);
     toolMode = '';
     refreshControls();
   });
   await page.click('#focusModeBtn');
-  results.focusActivation = await page.evaluate(() => ({
-    enabled: current.edits.mask.enabled,
-    dirty: catalogDirty,
-    undoEntries: undoByPhoto.get(current.id)?.length || 0,
-    toolMode
-  }));
+  const focusArmed = await page.evaluate(() => ({ enabled: current.edits.masks.layers[0]?.enabled, dirty: catalogDirty, undoEntries: undoByPhoto.get(current.id)?.length || 0, toolMode }));
+  const focusCanvas = await page.locator('#canvas').boundingBox();
+  await page.mouse.click(focusCanvas.x + focusCanvas.width * .5, focusCanvas.y + focusCanvas.height * .5);
+  results.focusActivation = await page.evaluate(armed => ({ armed, enabled: current.edits.masks.layers[0]?.enabled, dirty: catalogDirty, undoEntries: undoByPhoto.get(current.id)?.length || 0, toolMode }), focusArmed);
 
   // Native constraints must reject invalid export values before opening a save dialog.
   await page.click('#exportBtn');
@@ -308,7 +306,7 @@ async function livePage(app) {
   // Corrupt settings and extremely small images must be contained by migration/analysis.
   results.corruptSettings = await page.evaluate(() => {
     const edits = E.migratedEdits({ mask: { enabled: true, size: -9999, feather: 9999, backgroundBlur: 100 } });
-    return { size: edits.mask.size, feather: edits.mask.feather };
+    return { size: edits.masks.layers[0]?.size, feather: edits.masks.layers[0]?.feather };
   });
   results.rotationCycle = await page.evaluate(() => {
     let edits = E.defaultEdits();
@@ -414,7 +412,7 @@ async function livePage(app) {
   if (!results.beforeHold.down.compare || results.beforeHold.down.pressed !== 'true' || results.beforeHold.up.compare || results.beforeHold.up.pressed !== 'false') failures.push('Before press/hold state failed');
   if (results.keyboardUndo.edited === results.keyboardUndo.before || results.keyboardUndo.undone !== results.keyboardUndo.before || !results.keyboardUndo.undoDisabled) failures.push('Keyboard range undo failed');
   if (!results.presetManualEdit.trackingCleared || results.presetManualEdit.beforeAmountMove !== results.presetManualEdit.afterAmountMove) failures.push('Preset amount overwrote a later manual edit');
-  if (!results.focusActivation.enabled || !results.focusActivation.dirty || results.focusActivation.undoEntries !== 1) failures.push('Focus activation was not persisted as one undoable edit');
+  if (results.focusActivation.armed.enabled || !results.focusActivation.armed.dirty || results.focusActivation.armed.undoEntries !== 1 || results.focusActivation.armed.toolMode !== 'focus' || !results.focusActivation.enabled || !results.focusActivation.dirty || results.focusActivation.undoEntries !== 2 || results.focusActivation.toolMode) failures.push('Object-mask creation/placement was not persisted as two undoable edits');
   if (!results.exportValidation.open || !results.exportValidation.invalid) failures.push('Export validation did not contain invalid input');
   if (!results.originalExport.target.includes('qa-0') || results.originalExport.disabled.some(value => !value) || !results.originalExport.noteVisible || !results.originalExport.note.includes('unchanged')) failures.push('Original export left irrelevant controls enabled');
   if (!results.modalShortcuts.exportOpen || results.modalShortcuts.helpOpen || results.modalShortcuts.flag !== 'none') failures.push('Modal shortcut containment failed');
@@ -425,7 +423,12 @@ async function livePage(app) {
   if (results.crashRecovery.id !== 'recovered' || results.crashRecovery.rating !== 5 || results.crashRecovery.recoveryRemaining) failures.push('Crash recovery selection failed');
   if (results.corruptSettings.size !== 5 || results.corruptSettings.feather !== 100 || !results.tinyAnalysis.finite || results.rotationCycle.final !== 0 || results.rotationCycle.unique !== 4) failures.push('Corrupt/tiny input or rotation containment failed');
   if (Object.values(results.controlEffects).some(value => value <= 0)) failures.push('A tested adjustment has no rendered effect');
-  if (results.responsive.some(state => state.mainDisplay !== 'flex' || !state.workspaceBeforeSidebar || state.horizontalOverflow > 2 || state.dialogMaxHeight === 'none' || state.clippedFocusable.length)) failures.push('High-zoom responsive reflow failed');
+  if (results.responsive.some(state => {
+    const expectedLayout = state.width > 760
+      ? state.mainDisplay === 'grid'
+      : state.mainDisplay === 'flex' && state.workspaceBeforeSidebar;
+    return !expectedLayout || state.horizontalOverflow > 2 || state.dialogMaxHeight === 'none' || state.clippedFocusable.length;
+  })) failures.push('High-zoom responsive reflow failed');
   if (results.catalogScale.filmstripNodes > 201 || results.catalogScale.libraryNodes > 400 || !results.catalogScale.moreVisible || results.catalogScale.afterLoadMore !== 800) failures.push('Catalog rendering bounds failed');
   if (errors.length) failures.push('Renderer emitted unexpected errors');
   results.failures = failures;

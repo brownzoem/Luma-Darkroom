@@ -8,7 +8,7 @@ application network API. The page Content Security Policy sets
 **connect-src 'none'**, and the main process does not implement an HTTP client
 workflow.
 
-This document describes the inspected 2.1.0 source. It is not a warranty,
+This document describes the inspected 2.2.0 source. It is not a warranty,
 privacy certification, or promise about modified builds, operating systems,
 package registries, hosting platforms, or other software.
 
@@ -19,7 +19,9 @@ package registries, hosting platforms, or other software.
 The application stores paths to imported photographs and reads image bytes on
 demand. Originals remain in their existing filesystem locations. Direct types
 are read into the main process; additional formats may be decoded with Sharp
-and sent to the renderer as JPEG bytes.
+and sent to the renderer as lossless 8-bit PNG bytes. The conversion does not
+preserve a full RAW development state, every source bit depth, or all embedded
+metadata.
 
 The current application does not upload photographs. The operating system,
 filesystem provider, backup software, synchronized folder, antivirus product,
@@ -30,7 +32,7 @@ or a modified distribution may behave independently of Luma Darkroom.
 Electron local browser storage contains:
 
 - source paths and display names;
-- edit instructions and cleanup coordinates;
+- edit instructions, local-mask layers and strokes, and retouch coordinates;
 - ratings, flags, color labels, keywords, and captions;
 - quality-analysis scores and issue labels;
 - import timestamps and internal IDs;

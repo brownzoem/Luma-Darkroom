@@ -213,8 +213,9 @@ async function waitForPreview(page) {
     };
   }, startingRevision);
   const zoomBaseWidth = responsiveness.settledWidth;
+  const zoomSourceWidth = await page.evaluate(() => sourceImage.naturalWidth);
   await page.locator('#zoomRange').evaluate(element => { element.value = '200'; element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); });
-  await page.waitForFunction(base => !previewWorkerBusy && !previewWorkerPending && canvas.width > base, zoomBaseWidth, { timeout: 30000 });
+  await page.waitForFunction(({ base, source }) => !previewWorkerBusy && !previewWorkerPending && (canvas.width > base || base >= source), { base: zoomBaseWidth, source: zoomSourceWidth }, { timeout: 30000 });
   const zoomedWidth = await page.evaluate(() => canvas.width);
   await page.click('#fitBtn');
   await waitForPreview(page);
@@ -233,9 +234,9 @@ async function waitForPreview(page) {
   if (!maskState.modes.includes('add') || !maskState.modes.includes('subtract') || historyAfterAdd !== historyBefore + 1 || maskState.history !== historyAfterAdd + 1 || !maskState.legacyOverlayHidden) failures.push('Mask refinement state or one-gesture undo history failed');
   if (!responsiveness.workerReady || responsiveness.workerBusy || responsiveness.pending || responsiveness.heartbeatTicks < 10 || responsiveness.maxHeartbeatGap > 200 || !responsiveness.previewRevisionAdvanced || responsiveness.settledWidth < 1050 || dragMs > 4000) failures.push('Slider preview was blocking, stale, or failed to restore high quality');
   if (!brushCursor.visible || brushCursor.width < 8) failures.push('Mask brush radius cursor was not visible');
-  if (zoomedWidth <= zoomBaseWidth) failures.push('Zoom did not request a higher-resolution settled preview');
+  if (zoomedWidth <= zoomBaseWidth && zoomBaseWidth < zoomSourceWidth) failures.push('Zoom did not request a higher-resolution settled preview');
   if (errors.length) failures.push('Renderer emitted unexpected errors');
-  const report = { preset: { blackAndWhite, color, amountAtZero, amountAtFifty, amountAfterUndo, amountAfterRedo, migratedMixerHue }, convertedSource, mask: { baseMask, rotatedMask, hardBrushPixels, brushCursor, addedMask, subtractedMask, historyBefore, historyAfterAdd, maskState }, responsiveness: { ...responsiveness, dragMs, zoomBaseWidth, zoomedWidth }, errors, failures };
+  const report = { preset: { blackAndWhite, color, amountAtZero, amountAtFifty, amountAfterUndo, amountAfterRedo, migratedMixerHue }, convertedSource, mask: { baseMask, rotatedMask, hardBrushPixels, brushCursor, addedMask, subtractedMask, historyBefore, historyAfterAdd, maskState }, responsiveness: { ...responsiveness, dragMs, zoomBaseWidth, zoomSourceWidth, zoomedWidth }, errors, failures };
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   await app.close();
   await fixtures.cleanup();

@@ -214,6 +214,14 @@ async function waitForPreview(page) {
   }, startingRevision);
   const zoomBaseWidth = responsiveness.settledWidth;
   const zoomSourceWidth = await page.evaluate(() => sourceImage.naturalWidth);
+  const zoomEdgePolicy = await page.evaluate(() => {
+    const wrap = document.querySelector('#canvasWrap'), range = document.querySelector('#zoomRange'), originalBounds = wrap.getBoundingClientRect, originalZoom = range.value;
+    wrap.getBoundingClientRect = () => ({ width: 420, height: 300 });
+    range.value = '100'; const fit = previewEdge(false);
+    range.value = '200'; const zoomed = previewEdge(false);
+    range.value = originalZoom; wrap.getBoundingClientRect = originalBounds;
+    return { fit, zoomed };
+  });
   await page.locator('#zoomRange').evaluate(element => { element.value = '200'; element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.waitForFunction(({ base, source }) => !previewWorkerBusy && !previewWorkerPending && (canvas.width > base || base >= source), { base: zoomBaseWidth, source: zoomSourceWidth }, { timeout: 30000 });
   const zoomedWidth = await page.evaluate(() => canvas.width);
@@ -234,9 +242,10 @@ async function waitForPreview(page) {
   if (!maskState.modes.includes('add') || !maskState.modes.includes('subtract') || historyAfterAdd !== historyBefore + 1 || maskState.history !== historyAfterAdd + 1 || !maskState.legacyOverlayHidden) failures.push('Mask refinement state or one-gesture undo history failed');
   if (!responsiveness.workerReady || responsiveness.workerBusy || responsiveness.pending || responsiveness.heartbeatTicks < 10 || responsiveness.maxHeartbeatGap > 200 || !responsiveness.previewRevisionAdvanced || responsiveness.settledWidth < 1050 || dragMs > 4000) failures.push('Slider preview was blocking, stale, or failed to restore high quality');
   if (!brushCursor.visible || brushCursor.width < 8) failures.push('Mask brush radius cursor was not visible');
+  if (zoomEdgePolicy.fit !== 1050 || zoomEdgePolicy.zoomed !== 2100) failures.push('Preview resolution did not scale from its minimum fit resolution when zoomed');
   if (zoomedWidth <= zoomBaseWidth && zoomBaseWidth < zoomSourceWidth) failures.push('Zoom did not request a higher-resolution settled preview');
   if (errors.length) failures.push('Renderer emitted unexpected errors');
-  const report = { preset: { blackAndWhite, color, amountAtZero, amountAtFifty, amountAfterUndo, amountAfterRedo, migratedMixerHue }, convertedSource, mask: { baseMask, rotatedMask, hardBrushPixels, brushCursor, addedMask, subtractedMask, historyBefore, historyAfterAdd, maskState }, responsiveness: { ...responsiveness, dragMs, zoomBaseWidth, zoomSourceWidth, zoomedWidth }, errors, failures };
+  const report = { preset: { blackAndWhite, color, amountAtZero, amountAtFifty, amountAfterUndo, amountAfterRedo, migratedMixerHue }, convertedSource, mask: { baseMask, rotatedMask, hardBrushPixels, brushCursor, addedMask, subtractedMask, historyBefore, historyAfterAdd, maskState }, responsiveness: { ...responsiveness, dragMs, zoomBaseWidth, zoomSourceWidth, zoomedWidth, zoomEdgePolicy }, errors, failures };
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   await app.close();
   await fixtures.cleanup();

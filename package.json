@@ -37,7 +37,7 @@
     "dist": "electron-builder --win nsis --x64"
   },
   "devDependencies": {
-    "@electron/asar": "^3.4.1",
+    "@electron/asar": "^4.2.1",
     "electron": "^43.4.0",
     "electron-builder": "^26.0.12",
     "playwright-core": "^1.62.1"

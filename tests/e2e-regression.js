@@ -32,8 +32,9 @@ let fixtures;
   await page.selectOption('[data-select-path="profile"]','Luma Vivid');
   await page.selectOption('[data-select-path="color.wb"]','Cloudy');
   await page.locator('[data-panel-name="Crop & Geometry"]').evaluate(el=>el.classList.remove('collapsed'));
+  const cropStartRevision=Number(await page.locator('#canvas').getAttribute('data-preview-revision')||0);
   await page.selectOption('[data-select-path="geometry.cropAspect"]','Square');
-  await page.waitForTimeout(250);
+  await page.waitForFunction(revision=>Number(canvas.dataset.previewRevision||0)>revision&&!previewWorkerPreparing&&!previewWorkerBusy&&!previewWorkerPending,cropStartRevision,{timeout:30000});
   const selectState=await page.evaluate(()=>({profile:current.edits.profile,wb:current.edits.color.wb,aspect:current.edits.geometry.cropAspect,canvas:[canvas.width,canvas.height]}));
   if(selectState.canvas[0]!==selectState.canvas[1])errors.push('Square crop did not render square');
 

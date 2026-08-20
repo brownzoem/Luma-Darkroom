@@ -5,9 +5,12 @@ const { createPhotoFixtures } = require('./helpers/photo-fixtures');
 
 (async () => {
   const root = path.resolve(__dirname, '..');
+  const packagedAsarMode = process.env.LUMA_PACKAGED_ASAR === '1';
   const executablePath = process.env.LUMA_EXECUTABLE_PATH
     ? path.resolve(process.env.LUMA_EXECUTABLE_PATH)
-    : path.join(root, 'outputs', 'release', 'win-unpacked', 'Luma Darkroom.exe');
+    : packagedAsarMode
+      ? path.join(root, 'node_modules', 'electron', 'dist', 'electron.exe')
+      : path.join(root, 'outputs', 'release', 'win-unpacked', 'Luma Darkroom.exe');
   const userData = path.join(root, 'work', `packaged-data-${process.pid}`);
   const runtimeCwd = path.join(userData, 'cwd');
   fs.mkdirSync(runtimeCwd, { recursive: true });
@@ -25,7 +28,10 @@ const { createPhotoFixtures } = require('./helpers/photo-fixtures');
     cwd: runtimeCwd,
   };
   if (process.env.LUMA_SOURCE) launchOptions.args.push(root);
-  else launchOptions.executablePath = executablePath;
+  else {
+    launchOptions.executablePath = executablePath;
+    if (packagedAsarMode) launchOptions.args.push(path.join(root, 'outputs', 'release', 'win-unpacked', 'resources', 'app.asar'));
+  }
   const app = await electron.launch(launchOptions);
   app.process().stdout?.on('data', (chunk) => console.log(`stdout: ${chunk}`));
   app.process().stderr?.on('data', (chunk) => console.error(`stderr: ${chunk}`));

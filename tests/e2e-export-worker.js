@@ -64,9 +64,16 @@ async function livePage(app) {
     edits.detail.sharpenDetail = 70;
     edits.detail.noiseColor = 35;
     edits.effects.grain = 18;
-    edits.mask.enabled = true;
-    edits.mask.type = 'subject';
-    edits.mask.backgroundBlur = 25;
+    const mask = E.defaultMaskLayer({
+      id: 'export-object',
+      name: 'Export object',
+      enabled: true,
+      type: 'subject',
+      x: 0.45,
+      y: 0.42,
+      backgroundBlur: 25,
+    });
+    edits.masks = { activeId: mask.id, layers: [mask] };
 
     let ticks = 0;
     let frames = 0;

@@ -72,7 +72,7 @@ async function fetchSource(source) {
     redirect: 'follow',
     signal: AbortSignal.timeout(30_000),
     headers: {
-      'User-Agent': 'Luma-Darkroom-license-audit/2.1 (+https://lumadarkroom.com)',
+      'User-Agent': 'Luma-Darkroom-license-audit/2.2 (+https://lumadarkroom.com)',
       Accept: 'text/plain, application/octet-stream;q=0.9, */*;q=0.1',
     },
   });

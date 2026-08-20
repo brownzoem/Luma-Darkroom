@@ -2,21 +2,24 @@
 
 ## Overview
 
-Luma Darkroom is a static Electron desktop application with four code
+Luma Darkroom is a static Electron desktop application with five code
 boundaries:
 
 1. the Electron main process owns native windows, filesystem dialogs, custom
    image loading, Sharp decoding, and writes;
 2. a context-isolated preload exposes a small asynchronous API;
-3. the renderer owns catalog state, interaction, preview processing, and the
+3. the renderer owns catalog state, interaction, worker orchestration, and the
    visible UI;
-4. a dedicated export worker performs full export rendering and encoding away
+4. a persistent preview worker coalesces interactive render requests away from
+   the UI thread;
+5. a dedicated export worker performs full export rendering and encoding away
    from the UI thread.
 
 There is no runtime web server, frontend bundler, account service, or remote API.
 The renderer loads **src/index.html**, **src/styles.css**, **src/engine.js**, and
-**src/app.js** directly from the installed application. Export jobs load
-**src/render-worker.js** and the same engine in a worker context.
+**src/app.js** directly from the installed application. Preview and export jobs
+load **src/preview-worker.js** or **src/render-worker.js** and the same engine in
+a worker context.
 
 ## Component map
 
@@ -64,7 +67,8 @@ The application layer:
 - manages presets, metadata, filtering, culling shortcuts, selection, compare,
   merge, watermark history, and bounded undo/redo;
 - loads the active image and four bounded neighboring prefetch images;
-- schedules preview rendering on animation frames;
+- creates a persistent, coalescing preview worker with stale-result rejection,
+  watchdog recovery, and a bounded main-thread fallback;
 - creates, monitors, cancels, and releases bounded background export workers;
 - contains user-facing recovery for async, decode, render, storage, and export
   failures.
@@ -78,10 +82,17 @@ The engine is a browser-global module. It provides:
 - photo-record normalization;
 - orientation, flip, transform, and crop;
 - tone, curve, color, mixer, point-color, grading, masks, vignette, grain,
-  detail, focus blur, cleanup, and watermark processing;
+  detail, focus blur, retouch, and watermark processing;
 - image-quality analysis.
 
 It accepts an already decoded image plus edit state and returns a canvas.
+
+### src/preview-worker.js
+
+The preview worker retains one transferred bitmap for the active photograph,
+renders only the latest pending request, and returns an ImageBitmap to the
+renderer. Request IDs and photo tokens reject stale frames. Startup and render
+watchdogs dispose a failed or hung worker and allow bounded fallback rendering.
 
 ### src/render-worker.js
 
@@ -101,7 +112,10 @@ its bitmap and worker resources on success, failure, cancellation, or timeout.
 5. TIFF, AVIF, HEIF/HEIC, and listed camera-file extensions are attempted
    through Sharp with a 150-megapixel decode limit and automatic orientation.
    Codec support is not guaranteed.
-6. Converted images are returned as high-quality JPEG for renderer processing.
+6. Converted images are returned as lossless 8-bit PNG for renderer
+   processing, subject to a 350 MB decoded-buffer limit. This avoids an extra
+   lossy generation but is not a scene-referred RAW or metadata-preserving
+   development path.
 7. The renderer decodes the active image into an Image object. A selection token
    discards stale callbacks; errors and a 30-second timeout return the user to
    the library without dropping catalog metadata.
@@ -125,20 +139,24 @@ Edits are nested, versioned, non-destructive instructions:
 - optics toggles and manual corrections;
 - rotation, flip, straighten, perspective-like transforms, aspect, scale,
   offsets, and crop zoom/position;
-- one local mask configuration and a bounded cleanup-spot list.
+- up to eight ordered local-mask layers with bounded brush strokes, plus a
+  bounded source-anchored retouch list.
 
-The preview path renders a maximum long edge of 1050 pixels and retries at 640
-pixels after an allocation-style failure. Slider input is coalesced through
-requestAnimationFrame. Export transfers a decoded image to a dedicated worker,
-which calls the same engine at a requested size or full resolution and encodes
-the result. Export supports progress, cancellation, a 180-second timeout, and
-deterministic cleanup. The engine rejects output above 16,384 pixels on an edge
-or 50 million pixels to avoid predictable memory exhaustion.
+Interactive preview requests use a capped draft long edge and then settle at a
+zoom-, viewport-, and display-density-aware edge between 1050 and 3200 pixels.
+The preview worker coalesces superseded requests; allocation failures retry at
+a smaller size, and a watchdog recovers from a hung worker. Export transfers a
+decoded image to a dedicated worker, which calls the same engine at a requested
+size or full resolution and encodes the result. Export supports progress,
+cancellation, a 180-second timeout, and deterministic cleanup. The engine
+rejects output above 16,384 pixels on an edge or 50 million pixels to avoid
+predictable memory exhaustion.
 
-Preview processing remains synchronous and CPU-heavy. Some effect controls are
-approximations rather than camera-science or perceptual reference
-implementations. Moving preview and histogram work off the UI thread, or to a
-controlled GPU pipeline, remains a roadmap item.
+Pixel processing remains CPU-heavy. Local object/sky selection is bounded
+image analysis rather than semantic AI, mask maps are capped at a 512-pixel
+analysis edge, and some effect controls are visual approximations rather than
+camera-science or perceptual reference implementations. A controlled GPU or
+perceptual pipeline remains a roadmap possibility.
 
 ## Catalog
 
@@ -183,6 +201,8 @@ Manual JSON backup is the durable interchange and recovery mechanism.
 | Undo history | 50 entries per photo, 24 recently used photos |
 | One history entry | 750 KB serialized before + after |
 | Cleanup spots | 200 per photo |
+| Mask layers | Eight per photo |
+| Mask strokes | 256 per layer and 1,024 total per photo |
 | Curve points | 64 per channel |
 | Prefetch images | Four, two on either side |
 | Selected merge input | 12 photographs |
@@ -190,6 +210,7 @@ Manual JSON backup is the durable interchange and recovery mechanism.
 | Direct source-file size | 256 MB |
 | Conversion source-file size | 2 GB |
 | Sharp input pixels | 150 million |
+| Converted decoded buffer | 350 MB |
 | Encoded export IPC payload | 350 MB binary; legacy data URL capped at 350 million characters |
 | Engine output canvas | 16,384-pixel edge and 50 million pixels |
 

@@ -32,6 +32,8 @@ Run syntax checks:
     node --check electron/main.js
     node --check electron/preload.js
     node --check src/engine.js
+    node --check src/preview-worker.js
+    node --check src/render-worker.js
     node --check src/app.js
 
 Run the automated syntax, Electron smoke, control-regression, and resilience
@@ -51,8 +53,9 @@ Minimum manual matrix:
 - import direct JPEG/PNG/WebP and at least one Sharp-converted source;
 - missing, corrupt, unsupported, oversized, and permission-denied input;
 - rapid arrows, 0–5 ratings, P/X/U flags, G/D views, held original, undo/redo;
-- every develop panel, preset amount, mask mode, cleanup cap, rotate, flip,
-  crop, zoom, and reset;
+- every develop panel, preset replacement and amount, layered object/sky/brush/
+  gradient masks, reorder/invert/opacity/add/subtract, dodge/burn, clone/heal/
+  red-eye, cleanup cap, rotate, flip, crop, zoom, and reset;
 - close/relaunch autosave, recovery selection, quota failure, valid backup,
   corrupt backup, duplicate IDs, duplicate paths, and legacy migration;
 - two-photo compare, analysis, batch sync, HDR average, panorama bounds;

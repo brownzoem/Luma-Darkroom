@@ -212,10 +212,11 @@ app.whenReady().then(() => {
         const cacheKey=`${filePath}:${stat.mtimeMs}:${stat.size}`;
         file=decodedCache.get(cacheKey);
         if(!file){
-          file=await sharp(filePath,{failOn:'warning',limitInputPixels:150_000_000}).rotate().jpeg({quality:95,chromaSubsampling:'4:4:4'}).toBuffer();
+          file=await sharp(filePath,{failOn:'warning',limitInputPixels:150_000_000}).rotate().png({compressionLevel:6,adaptiveFiltering:true}).toBuffer();
           cacheDecoded(cacheKey,file);
         }
-        type='image/jpeg';
+        if(file.byteLength>350_000_000)return new Response('Decoded image is too large', { status:413, headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'} });
+        type='image/png';
       }
       const body = new Uint8Array(file.byteLength);
       body.set(file);

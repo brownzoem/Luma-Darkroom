@@ -95,7 +95,7 @@ async function launch(){
   await page.locator('[data-path="mask.backgroundBlur"]').dispatchEvent('change');
   await page.click('#cleanupMaskBtn');
   await page.mouse.click(canvasBox.x+canvasBox.width*.65,canvasBox.y+canvasBox.height*.5);
-  const maskState=await page.evaluate(()=>({enabled:current.edits.mask.enabled,spots:current.edits.cleanup.length}));
+  const maskState=await page.evaluate(()=>({enabled:current.edits.masks.layers[0]?.enabled,spots:current.edits.cleanup.length}));
   if(!maskState.enabled||maskState.spots!==1)throw new Error(`Mask failure ${JSON.stringify(maskState)}`);
   await page.screenshot({path:path.join(shots,'03-mask.png'),fullPage:true});mark('mask shot');
 

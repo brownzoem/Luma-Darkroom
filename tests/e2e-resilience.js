@@ -31,7 +31,7 @@ async function livePage(app) {
 }
 
 (async () => {
-  fixtures = await createPhotoFixtures(1);
+  fixtures = await createPhotoFixtures(12);
   [sample] = fixtures.paths;
   const errors = [];
   const results = {};
@@ -70,10 +70,10 @@ async function livePage(app) {
   await page.click('#tutorialNext');
   results.tutorial.persisted = await page.evaluate(() => localStorage.getItem('luma-first-run-tutorial-v1'));
 
-  await page.evaluate(filePath => {
+  await page.evaluate(filePaths => {
     photos = Array.from({ length: 12 }, (_item, index) => E.migratePhoto({
       id: `qa-${index}`,
-      filePath,
+      filePath: filePaths[index],
       name: `qa-${index}.jpg`,
       importedAt: Date.now() - index,
       edits: null
@@ -81,13 +81,12 @@ async function livePage(app) {
     catalogDirty = false;
     updateLibrary();
     selectPhoto(photos[0]);
-  }, sample);
+  }, fixtures.paths);
   await page.waitForFunction(() => canvas.width > 500, null, { timeout: 30000 });
 
   // Library actions must expose one unambiguous active target while selections remain batch targets.
   await page.keyboard.press('g');
-  await page.locator('.card').nth(1).focus();
-  await page.keyboard.press('Space');
+  await page.locator('.card').nth(1).press('Space');
   await page.waitForFunction(() => current?.id === 'qa-1' && view === 'library');
   results.targeting = await page.evaluate(() => ({
     activeId: current.id,
@@ -267,9 +266,28 @@ async function livePage(app) {
 
   // Rapid keyboard culling should settle on the requested image without stale renders.
   await page.keyboard.press('d');
+  await page.locator('#canvas').focus();
+  const rapidStart = await page.evaluate(() => ({ id: current?.id, toolMode, active: document.activeElement?.id }));
   for (let index = 0; index < 9; index++) await page.keyboard.press('ArrowRight');
-  await page.waitForFunction(() => current?.id === 'qa-9' && canvas.width > 500, null, { timeout: 30000 });
-  results.rapidNavigation = await page.evaluate(() => ({ id: current.id, prefetch: prefetchCache.size, canvas: [canvas.width, canvas.height] }));
+  try {
+    await page.waitForFunction(() => current?.id === 'qa-9' && canvas.width > 500, null, { timeout: 30000 });
+  }
+  catch (error) {
+    const state = await page.evaluate(() => ({
+      current: current?.id,
+      view,
+      canvas: [canvas.width, canvas.height],
+      loadToken: imageLoadToken,
+      image: { complete: sourceImage.complete, naturalWidth: sourceImage.naturalWidth, src: sourceImage.src },
+      worker: { token: previewWorkerToken, ready: previewWorkerReady, busy: previewWorkerBusy, preparing: previewWorkerPreparing, failed: previewWorkerFailed, pending: !!previewWorkerPending },
+      active: document.activeElement?.id || document.activeElement?.tagName,
+      toast: document.querySelector('#toast')?.textContent || '',
+      prefetch: [...prefetchCache.keys()]
+    }));
+    console.error('Rapid navigation did not settle:', JSON.stringify(state));
+    throw error;
+  }
+  results.rapidNavigation = await page.evaluate(start => ({ start, id: current.id, prefetch: prefetchCache.size, canvas: [canvas.width, canvas.height] }), rapidStart);
 
   // A missing original should recover to Library with an actionable message.
   await page.evaluate(() => {
@@ -435,7 +453,7 @@ async function livePage(app) {
   if (!results.modalShortcuts.exportOpen || results.modalShortcuts.helpOpen || results.modalShortcuts.flag !== 'none') failures.push('Modal shortcut containment failed');
   if (results.restorePreview.before !== results.restorePreview.after || results.restorePreview.accepted || !results.restorePreview.summary.includes('Incoming catalog: 2') || !results.restorePreview.summary.includes('Current catalog: 12') || !results.restorePreview.summary.includes('3 invalid')) failures.push('Restore preview did not disclose or preserve state');
   if (results.toolExit.view !== 'library' || results.toolExit.toolMode) failures.push('Library retained an armed edit tool');
-  if (results.rapidNavigation.id !== 'qa-9' || results.rapidNavigation.prefetch > 4 || results.rapidNavigation.canvas[0] < 500) failures.push('Rapid navigation or prefetch bound failed');
+  if (results.rapidNavigation.start.id !== 'qa-0' || results.rapidNavigation.start.toolMode || results.rapidNavigation.start.active !== 'canvas' || results.rapidNavigation.id !== 'qa-9' || results.rapidNavigation.prefetch > 4 || results.rapidNavigation.canvas[0] < 500) failures.push('Rapid navigation or prefetch bound failed');
   if (results.missingFile.view !== 'library' || results.missingFile.canvas[0] !== 1) failures.push('Missing-file recovery failed');
   if (results.crashRecovery.id !== 'recovered' || results.crashRecovery.rating !== 5 || results.crashRecovery.recoveryRemaining) failures.push('Crash recovery selection failed');
   if (results.corruptSettings.size !== 5 || results.corruptSettings.feather !== 100 || !results.tinyAnalysis.finite || results.rotationCycle.final !== 0 || results.rotationCycle.unique !== 4) failures.push('Corrupt/tiny input or rotation containment failed');

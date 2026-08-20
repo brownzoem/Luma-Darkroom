@@ -32,6 +32,8 @@ const requiredFiles = [
   'resources/licenses/third_party/NATIVE_SOURCE_MANIFEST.json',
   'resources/licenses/third_party/AOM-LICENSE.txt',
   'resources/licenses/third_party/AOM-PATENTS.txt',
+  'resources/licenses/third_party/ONNXRUNTIME-MIT.txt',
+  'resources/licenses/third_party/ONNXRUNTIME-THIRD-PARTY-NOTICES.txt',
   'resources/licenses/third_party/SHARP-LIBVIPS-THIRD-PARTY-NOTICES.md',
   'resources/licenses/third_party/SHARP-WIN32-X64-VERSIONS.json',
   'resources/licenses/third_party/SOURCE_AVAILABILITY.md',
@@ -113,8 +115,18 @@ const asarEntries = asar.listPackage(appAsar);
 const normalizedAsarEntries = new Set(
   asarEntries.map((entry) => entry.replaceAll('\\', '/').replace(/^\/+/, '')),
 );
-if (!normalizedAsarEntries.has('src/render-worker.js')) {
-  fail('Packaged application is missing required ASAR file: src/render-worker.js');
+const requiredAsarEntries = [
+  'electron/model-manager.js',
+  'electron/custom-presets.js',
+  'src/render-worker.js',
+  'src/ai-client.js',
+  'src/ai-segmentation-worker.js',
+  'node_modules/onnxruntime-web/dist/ort.all.min.js',
+  'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
+  'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
+];
+for (const required of requiredAsarEntries) {
+  if (!normalizedAsarEntries.has(required)) fail(`Packaged application is missing required ASAR file: ${required}`);
 }
 const disallowed = asarEntries.filter((entry) =>
   /(^|[\\/])(work|tests?|docs|guide-site|outputs|\.git|\.openai|\.env)([\\/]|$)/i.test(entry)

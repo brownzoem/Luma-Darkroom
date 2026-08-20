@@ -3,7 +3,7 @@
 ## Purpose and assumptions
 
 This document records intended trust boundaries and known limitations of the
-2.3.0 codebase. It helps reviewers reason about changes; it is not a formal
+2.4.0 codebase. It helps reviewers reason about changes; it is not a formal
 audit, proof, certification, warranty, or legal guarantee.
 
 The model assumes:
@@ -21,6 +21,8 @@ The model assumes:
 - original photograph bytes and filesystem locations;
 - edit instructions, ratings, flags, labels, tags, captions, and quality data;
 - catalog recovery and backup copies;
+- custom presets, recovery copies, and imported/exported preset files;
+- optional verified local selection-model files;
 - exported photographs and original-file copies;
 - application code-signing material, if a distributor uses any;
 - the privilege boundary between renderer and main process.
@@ -55,8 +57,9 @@ must not be described as equivalent to full renderer sandboxing.
 
 ### Preload bridge
 
-The preload exposes eight narrow functions rather than raw Electron APIs. It
-does not expose arbitrary IPC channel names. Every privileged message must
+The preload exposes narrow functions and frozen grouped APIs rather than raw
+Electron APIs. It does not expose arbitrary IPC channel names, filesystem paths
+for models, or model download URLs. Every privileged message must
 still be validated by the main process because renderer-side checks are not a
 security boundary.
 
@@ -65,7 +68,8 @@ security boundary.
 The main process has Node and filesystem privileges. Native dialogs determine
 import and save locations. Supported operations are bounded image read,
 best-effort conversion, export write, original copy, catalog backup read/write,
-and reveal-in-folder.
+custom-preset import/export, reveal-in-folder, and explicitly approved model
+downloads from fixed HTTPS origins.
 
 Writes use a destination-directory temporary file, flush, and rename. This
 reduces partial outputs but does not eliminate filesystem races, device
@@ -102,9 +106,18 @@ security work.
 | reveal-file | Absolute existing path and image/catalog extension allowlist |
 | save-catalog | String input and 50 MB limit |
 | open-catalog | Native file selection, regular file, 50 MB limit |
+| custom-presets-export | Exact versioned envelope and preset schema; allowlisted edit domains; 100-entry, 512 KB file, 64 KB patch, depth/node/array/key/text/number bounds; blocked prototype keys; native save destination |
+| custom-presets-import | Native JSON selection; regular-file and 512 KB limits; the same exact schema and structural validation before renderer delivery |
+| ai-model-list / status | No renderer paths or URLs; returns public metadata for the fixed model allowlist |
+| ai-model-download / cancel | Exact allowlisted ID; HTTPS/final-origin, expected-length, 100 MB stream, and SHA-256 checks; deduplicated and cancelable transfer |
+| ai-model-get | Exact allowlisted ID; re-verifies the regular stored file and returns only bounded bytes plus public metadata |
+| ai-model-remove | Exact allowlisted ID; symlink-safe storage checks before deleting that model and its partial file |
+| ai-model-progress | Main-to-renderer event containing bounded status metadata for known model IDs; no path or URL |
 
 Export and backup destinations come from save dialogs. The application does not
-accept a renderer-specified arbitrary destination path.
+accept a renderer-specified arbitrary destination path. Custom-preset files are
+validated independently in both renderer and main process; this is defense in
+depth, not a trust relationship with imported JSON.
 
 ## Catalog defenses
 
@@ -119,6 +132,10 @@ accept a renderer-specified arbitrary destination path.
 - Duplicate paths are skipped and duplicate IDs are replaced.
 - A completely unreadable catalog is preserved rather than autosaved as empty.
 - Restore happens in memory only after complete validation.
+- Custom presets use separate primary and in-progress recovery records plus a
+  last-good pre-import snapshot. They
+  allowlist reusable edit domains, exclude geometry/masks/repairs, and reject
+  prototype keys, non-finite values, excessive structure, and oversized input.
 
 A checksum detects accidental inconsistency; it is not a signature or
 authenticator. Anyone able to modify local storage can replace both content and
@@ -127,8 +144,11 @@ checksum.
 ## Availability and resource controls
 
 The code bounds input file size, decode pixels, cache bytes/count, catalog
-bytes/count, history entries, cleanup spots, prefetch count, merge count,
-panorama size, output canvas size, image-load time, and export IPC size.
+bytes/count, history entries and bytes, cleanup spots, semantic masks, brush
+paths and points, prefetch count, merge count, panorama size, output canvas
+size, image-load time, model download size, and export IPC size. Model
+inference is single-flight so repeated selection actions cannot overlap heavy
+runtime sessions.
 
 These limits mitigate common out-of-memory and denial-of-service paths. They do
 not guarantee availability at the maximum on every computer. Canvas and native
@@ -137,8 +157,12 @@ decoder memory can exceed simple byte estimates.
 ## Runtime network and crash behavior
 
 The renderer's CSP denies network connections. No runtime telemetry or updater
-is implemented. Electron crashReporter is started with **uploadToServer:
-false**, so crash dumps are local unless another system collects them.
+is implemented. After explicit user approval, the main process may fetch one of
+two fixed local-selection model assets from allowlisted HTTPS origins. It sends
+no photograph or catalog data; the hosting service still receives ordinary
+request metadata such as IP address and timing. Electron crashReporter is
+started with **uploadToServer: false**, so crash dumps are local unless another
+system collects them.
 
 Installation and build dependencies can use the network outside the running
 application. The operating system may perform its own reputation checks or
@@ -155,6 +179,8 @@ diagnostics.
 - There is no automatic dependency-vulnerability scanning or update mechanism
   represented in the repository scripts.
 - Native decoders remain a significant input surface.
+- Optional model downloads and the native/WASM inference runtime add a bounded
+  supply-chain and parser surface despite origin, length, and hash validation.
 - Large encoded exports can still duplicate memory across the worker, renderer,
   IPC, and main process.
 - Atomic writes reduce but cannot eliminate storage failure.

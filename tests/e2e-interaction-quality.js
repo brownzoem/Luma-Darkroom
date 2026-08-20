@@ -101,7 +101,9 @@ async function waitForPreview(page) {
     scheduleRender();
   });
   await page.click('#maskPanelTab');
-  await page.click('#subjectMaskBtn');
+  // Exercise migration-compatible manual object selection without downloading
+  // the optional semantic model in this rendering/latency suite.
+  await page.evaluate(() => addMaskAndActivate('subject'));
   let canvasBox = await page.locator('#canvas').boundingBox();
   await page.mouse.click(canvasBox.x + canvasBox.width * .5, canvasBox.y + canvasBox.height * .78);
   await waitForPreview(page);

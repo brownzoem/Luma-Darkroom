@@ -3,7 +3,7 @@
 Luma Darkroom includes and uses third-party software. Those components are
 licensed by their respective authors under their own terms. This file is an
 inventory and attribution aid based on **package-lock.json**, the installed
-packages, and the Windows x64 unpacked application inspected on 2026-08-18. It
+packages, and the Windows x64 application inputs inspected on 2026-08-20. It
 is not legal advice or a guarantee that a particular distribution satisfies
 every obligation.
 
@@ -49,6 +49,28 @@ Windows application contains **LICENSE.electron.txt** and
 binary distribution. The Chromium notice file is the authoritative detailed
 inventory for those embedded components and is intentionally not reproduced
 here.
+
+### ONNX Runtime Web 1.27.0
+
+- License: MIT
+- Copyright: Microsoft Corporation and contributors
+- Use: local, offline execution of optional image-selection models in a Web Worker
+
+The npm package also brings in `onnxruntime-common`, FlatBuffers, protobufjs,
+Long, platform.js, and small JavaScript support packages under their respective
+MIT, Apache-2.0, BSD-3-Clause, or ISC terms. The complete upstream ONNX Runtime
+MIT license and its release-pinned third-party notice are included as
+`third_party/ONNXRUNTIME-MIT.txt` and
+`third_party/ONNXRUNTIME-THIRD-PARTY-NOTICES.txt`. Preserve both with every
+binary distribution that contains ONNX Runtime Web or its WASM runtime.
+
+Optional EfficientSAM-Ti and PP-HumanSeg model files are not bundled in the
+installer. Luma downloads them only after explicit approval from immutable
+OpenCV Zoo commit `47534e27c9851bb1128ccc0102f1145e27f23f98`, verifies their
+exact sizes and SHA-256 values, and stores them locally. OpenCV Zoo documents
+those model packages as Apache-2.0. Their upstream training-image provenance is
+not a warranty from this project; redistributors must perform their own review
+before pre-bundling or mirroring model files.
 
 ### sharp 0.35.3
 
@@ -150,19 +172,19 @@ listed above.
 
 ## Locked dependency-license summary
 
-The current lockfile contains 359 package entries excluding the project root:
-32 production or platform-optional entries and 327 development entries. Every
+The current lockfile contains 375 package entries excluding the project root:
+50 production or platform-optional entries and 325 development entries. Every
 entry declares license metadata. Counts include packages for platforms that are
 not present in the inspected Windows x64 application.
 
 | Declared SPDX expression | Lockfile entries |
 | --- | ---: |
-| MIT | 247 |
-| ISC | 44 |
-| Apache-2.0 | 21 |
+| MIT | 250 |
+| ISC | 45 |
+| Apache-2.0 | 23 |
 | BlueOak-1.0.0 | 12 |
 | LGPL-3.0-or-later | 10 |
-| BSD-3-Clause | 9 |
+| BSD-3-Clause | 19 |
 | BSD-2-Clause | 6 |
 | Apache-2.0 AND LGPL-3.0-or-later | 3 |
 | Apache-2.0 AND LGPL-3.0-or-later AND MIT | 1 |
@@ -170,8 +192,8 @@ not present in the inspected Windows x64 application.
 | WTFPL OR ISC | 1 |
 | WTFPL | 1 |
 | 0BSD | 1 |
-| MIT OR CC0-1.0 | 1 |
-| WTFPL OR MIT | 1 |
+| (MIT OR CC0-1.0) | 1 |
+| (WTFPL OR MIT) | 1 |
 
 Less-common build-tree packages include **argparse** under Python-2.0,
 **truncate-utf8-bytes** under WTFPL, **sanitize-filename** under WTFPL OR ISC,

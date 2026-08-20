@@ -3,12 +3,13 @@
 ## Summary
 
 Luma Darkroom is designed to run locally. The current runtime has no account,
-telemetry, advertising, analytics, cloud upload, remote preset service, or
-application network API. The page Content Security Policy sets
-**connect-src 'none'**, and the main process does not implement an HTTP client
-workflow.
+telemetry, advertising, analytics, cloud photo upload, remote preset service,
+or application backend. The page Content Security Policy sets
+**connect-src 'none'**. The main process can make one narrow kind of optional
+network request: downloading a user-approved local selection model from fixed,
+allowlisted HTTPS URLs.
 
-This document describes the inspected 2.3.0 source. It is not a warranty,
+This document describes the inspected 2.4.0 source. It is not a warranty,
 privacy certification, or promise about modified builds, operating systems,
 package registries, hosting platforms, or other software.
 
@@ -44,19 +45,31 @@ for small catalogs a previous last-good copy. A legacy catalog key may remain
 after migration. These copies exist to improve recovery and can contain older
 metadata values.
 
+### Custom presets
+
+Electron local browser storage also contains custom-preset names, groups,
+timestamps, scope choices, and reusable edit settings, with an in-progress
+recovery record during saves and a last-good snapshot before import. By default,
+custom presets exclude
+exposure and white balance; a user can explicitly include them. Crop/geometry,
+masks, cleanup/repair coordinates, and tool state are not stored in custom
+presets. A manually exported preset JSON file remains at the location selected
+by the user until it is removed.
+
 ### Memory caches
 
-The renderer retains the active decoded image and at most four neighboring
-prefetch Image objects. The main process may retain up to three converted image
+The renderer retains the active decoded image and at most one neighboring
+prefetch Image object. The main process may retain up to three converted image
 buffers totaling at most 256 MB. These are memory caches, not intentional disk
 thumbnail archives, but operating systems can page process memory to disk.
 
 ### Exports and backups
 
-Exports, original copies, and JSON catalog backups are written to a location
-chosen in a native save dialog. These files remain until the user or another
-program removes them. A catalog backup contains paths, edits, and metadata but
-not source-image bytes.
+Exports, original copies, JSON catalog backups, and custom-preset JSON files
+are written to a location chosen in a native save dialog. These files remain
+until the user or another program removes them. A catalog backup contains
+paths, edits, and metadata but not source-image bytes; a preset file contains
+only the selected reusable edit settings and preset labels.
 
 ### Crash data and logs
 
@@ -66,12 +79,33 @@ unless a user, diagnostic tool, operating system, or modified build captures or
 shares them. Logs and dumps can contain technical details; inspect and redact
 them before sharing.
 
+## Optional local selection models
+
+Object and people selections use optional model files. The application asks
+before each model's first download and shows its approximate size. A download
+can be canceled, and an installed model can be removed from Help. Model files
+are stored in the application's per-user data directory under **ai-models**.
+
+The main process downloads only exact model IDs from fixed, immutable upstream
+repository URLs on **media.githubusercontent.com**. It rejects other IDs,
+non-HTTPS or redirected origins, unexpected lengths, oversized streams, and
+hash mismatches. Downloads use a temporary file, flush, verification, and an
+atomic rename. Photographs are not sent with these requests. After installation,
+selection inference runs locally in a dedicated worker.
+
+Like any HTTPS request, a model download exposes the user's IP address, request
+time, requested model URL, and ordinary connection metadata to the network
+provider and hosting service. Their own policies and logs apply independently
+of this project.
+
 ## Network behavior
 
-Runtime photo editing does not require a network connection. Installing npm
-dependencies, building Electron, obtaining an installer, checking a source
-hosting site, or using operating-system services can involve network access
-outside the running application.
+Normal editing and installed local-model inference do not require a network
+connection. The renderer cannot make network requests. Apart from the explicit
+model download described above, the application has no runtime HTTP workflow.
+Installing npm dependencies, building Electron, obtaining an installer,
+checking a source-hosting site, or using operating-system services can involve
+network access outside the running application.
 
 The project has no auto-update implementation. A distributor that adds updates,
 telemetry, remote AI, cloud storage, or online assets must disclose and secure
@@ -90,9 +124,10 @@ Luma Darkroom currently has no in-app erase-all control. To remove data:
 1. save any catalog backup or export that should be retained;
 2. close the application;
 3. uninstall the application if desired;
-4. remove its per-user application-data directory using operating-system
+4. use Help to remove optional local model files, if installed;
+5. remove its per-user application-data directory using operating-system
    tools;
-5. separately remove manual backups, exports, crash dumps, and originals as
+6. separately remove manual backups, exports, crash dumps, and originals as
    appropriate.
 
 Uninstallers do not always remove user data. Deletion, backups, filesystem

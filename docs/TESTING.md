@@ -12,8 +12,10 @@ Install the exact locked dependencies, then run:
 
 The suite includes:
 
-- JavaScript syntax checks for the main process, preload, edit engine, preview
-  worker, export worker, and UI;
+- JavaScript syntax checks for the main process, preload, model and preset
+  boundaries, edit engine, preview/export/selection workers, and UI;
+- a capability-contract check that requires the public feature matrix and
+  blocks unsupported features from being marked available;
 - an Electron workflow smoke test covering develop, presets, masks, metadata,
   minimum-window layout, persistence, and restart;
 - a control-regression pass that exercises every generated range and toggle,
@@ -26,6 +28,17 @@ The suite includes:
 - an interaction-quality pass covering preset replacement, converted-source
   fidelity, zoom-aware preview resolution, mask refinement, and UI heartbeat
   latency;
+- a custom-preset validator and Electron workflow covering default and explicit
+  capture scope, search, apply amount, one-step undo, rename/delete, autosave,
+  restart recovery, ID-conflict import-as-copy, pre-import recovery, JSON round
+  trips, and hostile/oversized import rejection;
+- model-manager tests covering exact-ID allowlisting, redirect/origin and size
+  checks, streamed hash verification, atomic storage, cancellation, symlink
+  defenses, and removal;
+- real offline selection-model tests plus semantic-mask schema, range,
+  single-flight, large-mask undo, restart, and preview/export parity checks;
+- a Point Color and calibration contract covering hostile inputs, range
+  behavior, eight-target limits, undo/restart, and preview/export parity;
 - a frozen legacy-render migration pass covering version 2 mask and cleanup
   appearance plus hostile repair-radius allocation bounds;
 - a layered-tools pass covering mask order and opacity, all rotate/flip and
@@ -66,9 +79,10 @@ Build all release assets, then run the packaged checks:
     npm run test:packaged
     npm run verify:release
 
-The packaged smoke test launches the unpacked executable. Release verification
-checks version agreement, expected license delivery, the packaged ASAR file
-list, native-library notice hashes, Authenticode status, and SHA-256 values for
+The packaged smoke test launches the unpacked executable and checks the narrow
+custom-preset and model-manager preload surfaces. Release verification checks
+version agreement, expected license delivery, required render/selection/model
+runtime ASAR files, native-library notice hashes, Authenticode status, and SHA-256 values for
 the installer, native corresponding-source archive, and notice archive.
 
 If Windows Application Control blocks the unsigned unpacked executable, run
@@ -80,8 +94,9 @@ normal disposable Windows VM.
 ## Human release session
 
 Use disposable photographs and a disposable user-data profile. Exercise a
-fresh launch, tutorial, import, keyboard-only culling, every panel, preset
-amount, multiple mask layers and refinements, gradients, dodge/burn,
+fresh launch, tutorial, import, keyboard-only culling, every panel, built-in
+and custom preset creation/search/amount/import/export/undo, multiple mask
+layers and refinements, gradients, dodge/burn,
 clone/heal/red-eye, undo/redo, backup/restore, missing originals, all export
 formats, cancellation, restart recovery, minimum-window layout, Windows display
 scaling, install/upgrade/uninstall, and the exact hashed installer.

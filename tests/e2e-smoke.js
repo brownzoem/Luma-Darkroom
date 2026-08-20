@@ -88,9 +88,9 @@ async function launch(){
   await page.waitForTimeout(200);
   await page.screenshot({path:path.join(shots,'02-presets.png'),fullPage:true});mark('presets shot');
 
-  // Subject focus and cleanup interactions.
+  // Local brush and cleanup interactions (no optional model download required).
   await page.click('.panel-tabs [data-panel="mask"]');
-  await page.click('#subjectMaskBtn');
+  await page.click('#addBrushMask');
   const canvasBox=await page.locator('#canvas').boundingBox();
   await page.mouse.click(canvasBox.x+canvasBox.width*.42,canvasBox.y+canvasBox.height*.43);
   await page.locator('[data-path="mask.backgroundBlur"]').fill('30');

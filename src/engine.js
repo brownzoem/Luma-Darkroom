@@ -1,24 +1,28 @@
 (() => {
+  const EDIT_SCHEMA_VERSION=7;
   const COLORS=['red','orange','yellow','green','aqua','blue','purple','magenta'];
   const HUE_CENTERS={red:0,orange:30,yellow:60,green:120,aqua:180,blue:230,purple:275,magenta:320};
   const clone=v=>JSON.parse(JSON.stringify(v));
   const BLOCKED_KEYS=new Set(['__proto__','prototype','constructor']);
-  const MAX_CURVE_POINTS=64,MAX_CLEANUP_SPOTS=200,MAX_MASK_LAYERS=8,MAX_MASK_STROKES=256,MAX_TOTAL_MASK_STROKES=1024,MAX_MASK_POINTS_PER_PATH=4096,MAX_MASK_POINTS_PER_LAYER=8192,MAX_TOTAL_MASK_POINTS=8192,MAX_CANVAS_EDGE=16384,MAX_CANVAS_PIXELS=50_000_000;
+  const MAX_CURVE_POINTS=64,MAX_CLEANUP_SPOTS=200,MAX_MASK_LAYERS=8,MAX_MASK_STROKES=256,MAX_TOTAL_MASK_STROKES=1024,MAX_MASK_POINTS_PER_PATH=4096,MAX_MASK_POINTS_PER_LAYER=8192,MAX_TOTAL_MASK_POINTS=8192,MAX_SEMANTIC_MASK_EDGE=2048,MAX_SEMANTIC_MASK_PIXELS=4_000_000,MAX_CANVAS_EDGE=16384,MAX_CANVAS_PIXELS=50_000_000;
 
   function defaultMaskLayer(overrides={}){
     return Object.assign({
       id:'',name:'Mask',enabled:true,type:'subject',purpose:'',space:'source',legacyShape:'',legacySampling:false,x:.5,y:.5,x2:.5,y2:.8,size:35,range:35,feather:55,brushSize:12,brushFeather:55,strokes:[],invert:false,opacity:100,flow:100,toneRange:'all',protectTones:false,
-      subjectExposure:0,subjectClarity:0,backgroundExposure:0,backgroundBlur:0,skyExposure:0,skyTemperature:0,localTemperature:0,localTint:0,localSaturation:0,localBlur:0,show:true
+      rangeType:'none',rangeMin:0,rangeMax:100,rangeFeather:10,rangeHue:0,rangeSaturation:50,rangeLuminance:50,rangeAmount:50,semantic:null,
+      subjectExposure:0,subjectClarity:0,backgroundExposure:0,backgroundBlur:0,skyExposure:0,skyTemperature:0,
+      localContrast:0,localHighlights:0,localShadows:0,localWhites:0,localBlacks:0,localTemperature:0,localTint:0,localHue:0,localSaturation:0,localTexture:0,localClarity:0,localDehaze:0,localSharpness:0,localNoise:0,localMoire:0,localDefringe:0,localGrain:0,localBlur:0,show:true
     },overrides);
   }
 
   function defaultEdits(){
     const mixer={}; COLORS.forEach(c=>mixer[c]={hue:0,saturation:0,luminance:0});
     return {
-      version:5,profile:'Luma Color',profileAmount:100,bw:false,
+      version:EDIT_SCHEMA_VERSION,profile:'Luma Color',profileAmount:100,bw:false,
       light:{exposure:0,contrast:0,highlights:0,shadows:0,whites:0,blacks:0},
       curve:{channel:'rgb',rgb:[[0,0],[255,255]],red:[[0,0],[255,255]],green:[[0,0],[255,255]],blue:[[0,0],[255,255]],refineSaturation:0},
-      color:{wb:'As Shot',temperature:0,tint:0,vibrance:0,saturation:0},mixer,pointColor:{enabled:false,hue:30,hueShift:0,saturationShift:0,luminanceShift:0,variance:25,range:30,visualize:false},
+      color:{wb:'As Shot',temperature:0,tint:0,vibrance:0,saturation:0},mixer,pointColor:{enabled:false,visualize:false,activeId:'',swatches:[]},
+      calibration:{shadowTint:0,redPrimaryHue:0,redPrimarySaturation:0,greenPrimaryHue:0,greenPrimarySaturation:0,bluePrimaryHue:0,bluePrimarySaturation:0},
       grading:{shadows:{hue:220,saturation:0,luminance:0},midtones:{hue:40,saturation:0,luminance:0},highlights:{hue:45,saturation:0,luminance:0},global:{hue:30,saturation:0,luminance:0},blending:50,balance:0},
       effects:{texture:0,clarity:0,dehaze:0,vignette:0,vignetteMidpoint:50,vignetteRoundness:0,vignetteFeather:50,vignetteHighlights:0,grain:0,grainSize:25,grainRoughness:50},
       detail:{sharpening:0,radius:1,sharpenDetail:25,sharpenMasking:0,noiseLuminance:0,noiseDetail:50,noiseContrast:0,noiseColor:0,colorDetail:50,colorSmoothness:50},
@@ -32,16 +36,21 @@
 
   function sanitizeNumber(path,value,fallback){
     const n=Number(value);if(!Number.isFinite(n))return fallback;
-    if(path==='version')return 5;
+    if(path==='version')return EDIT_SCHEMA_VERSION;
     if(['mask.x','mask.y','mask.x2','mask.y2'].includes(path))return Math.max(0,Math.min(1,n));
-    if((path.startsWith('grading.')&&path.endsWith('.hue'))||path==='pointColor.hue')return Math.max(0,Math.min(360,n));
-    if(path.startsWith('mixer.')&&path.endsWith('.hue')||path==='pointColor.hueShift')return Math.max(-100,Math.min(100,n));
+    if((path.startsWith('grading.')&&path.endsWith('.hue'))||/^pointColor\.swatches\.\d+\.hue$/.test(path))return Math.max(0,Math.min(360,n));
+    if(path.startsWith('mixer.')&&path.endsWith('.hue')||/^pointColor\.swatches\.\d+\.(hueShift|saturationShift|luminanceShift)$/.test(path)||path.startsWith('calibration.'))return Math.max(-100,Math.min(100,n));
+    if(/^pointColor\.swatches\.\d+\.(saturation|luminance|saturationRange|luminanceRange|feather|variance)$/.test(path))return Math.max(0,Math.min(100,n));
+    if(/^pointColor\.swatches\.\d+\.hueRange$/.test(path))return Math.max(1,Math.min(180,n));
+    if(/^pointColor\.swatches\.\d+\.range$/.test(path))return Math.max(1,Math.min(100,n));
     if(path.includes('exposure')||path==='light.exposure')return Math.max(-5,Math.min(5,n));
     if(path==='profileAmount')return Math.max(0,Math.min(200,n));
     if(path==='mask.size')return Math.max(5,Math.min(90,n));
     if(path==='mask.range'||path==='mask.brushSize')return Math.max(1,Math.min(100,n));
-    if(['mask.feather','mask.brushFeather','mask.backgroundBlur','mask.localBlur','mask.opacity','mask.flow'].includes(path))return Math.max(0,Math.min(100,n));
-    if(['mask.localTemperature','mask.localTint','mask.localSaturation','mask.subjectClarity','mask.skyTemperature'].includes(path))return Math.max(-100,Math.min(100,n));
+    if(['mask.feather','mask.brushFeather','mask.backgroundBlur','mask.localBlur','mask.localSharpness','mask.localNoise','mask.localMoire','mask.localDefringe','mask.localGrain','mask.opacity','mask.flow','mask.rangeMin','mask.rangeMax','mask.rangeFeather','mask.rangeSaturation','mask.rangeLuminance','mask.rangeAmount'].includes(path))return Math.max(0,Math.min(100,n));
+    if(path==='mask.rangeHue')return Math.max(0,Math.min(360,n));
+    if(path==='mask.localHue')return Math.max(-180,Math.min(180,n));
+    if(['mask.localTemperature','mask.localTint','mask.localSaturation','mask.localContrast','mask.localHighlights','mask.localShadows','mask.localWhites','mask.localBlacks','mask.localTexture','mask.localClarity','mask.localDehaze','mask.subjectClarity','mask.skyTemperature'].includes(path))return Math.max(-100,Math.min(100,n));
     if(path==='retouch.size')return Math.max(.1,Math.min(25,n));
     if(['retouch.feather','retouch.opacity','retouch.pupilSize','retouch.darken'].includes(path))return Math.max(0,Math.min(100,n));
     if(path==='detail.radius')return Math.max(.1,Math.min(10,n));
@@ -54,7 +63,7 @@
     return value.slice(0,MAX_CLEANUP_SPOTS).flatMap(spot=>{
       if(!spot||typeof spot!=='object')return[];const x=Number(spot.x),y=Number(spot.y),size=Number(spot.size),sourceX=spot.sourceX==null?null:Number(spot.sourceX),sourceY=spot.sourceY==null?null:Number(spot.sourceY),radiusPx=spot.radiusPx==null?null:Number(spot.radiusPx),feather=spot.feather==null?65:Number(spot.feather),opacity=spot.opacity==null?90:Number(spot.opacity),pupilSize=spot.pupilSize==null?45:Number(spot.pupilSize),darken=spot.darken==null?70:Number(spot.darken);
       if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(size)||sourceX!=null&&!Number.isFinite(sourceX)||sourceY!=null&&!Number.isFinite(sourceY)||radiusPx!=null&&!Number.isFinite(radiusPx)||![feather,opacity,pupilSize,darken].every(Number.isFinite))return[];
-      const modern=['heal','clone','red-eye'].includes(spot.kind),legacy=spot.kind==='legacy-v2'||legacyVersion<4&&!modern;
+      const modern=['heal','clone','red-eye','pet-eye'].includes(spot.kind),legacy=spot.kind==='legacy-v2'||legacyVersion<4&&!modern;
       return[{kind:legacy?'legacy-v2':modern?spot.kind:'heal',space:legacy?'frame':['source','frame'].includes(spot.space)?spot.space:'frame',x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y)),sourceX:sourceX==null?null:Math.max(0,Math.min(1,sourceX)),sourceY:sourceY==null?null:Math.max(0,Math.min(1,sourceY)),radiusPx:radiusPx==null?null:Math.max(.1,Math.min(100000,radiusPx)),size:Math.max(.1,Math.min(25,size)),feather:legacy?0:Math.max(0,Math.min(100,feather)),opacity:legacy?88:Math.max(1,Math.min(100,opacity)),pupilSize:Math.max(1,Math.min(100,pupilSize)),darken:Math.max(0,Math.min(100,darken))}];
     });
   }
@@ -78,6 +87,23 @@
       result.push({x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y)),size:Math.max(1,Math.min(100,size)),feather:Math.max(0,Math.min(100,feather)),flow:Math.max(1,Math.min(100,flow)),mode:stroke.mode});pointCount++;
     }
     return result;
+  }
+  function sanitizePointColorSwatches(value){
+    if(!Array.isArray(value))return[];const result=[],used=new Set(),inspectionLimit=Math.min(value.length,32);
+    for(let index=0;index<inspectionLimit&&result.length<8;index++){
+      const raw=value[index];if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;const mode=raw.mode==='hue-v1'?'hue-v1':'color-v2',base=String(raw.id||`pc-${index+1}`).replace(/[^A-Za-z0-9_-]/g,'').slice(0,64)||`pc-${index+1}`;let id=base,suffix=2;while(used.has(id)){id=base.slice(0,Math.max(1,61-String(suffix).length))+'-'+suffix;suffix++}used.add(id);const path=`pointColor.swatches.${result.length}`;
+      result.push({id,enabled:raw.enabled!==false,mode,hue:sanitizeNumber(`${path}.hue`,raw.hue,30),saturation:sanitizeNumber(`${path}.saturation`,raw.saturation,50),luminance:sanitizeNumber(`${path}.luminance`,raw.luminance,50),hueShift:sanitizeNumber(`${path}.hueShift`,raw.hueShift,0),saturationShift:sanitizeNumber(`${path}.saturationShift`,raw.saturationShift,0),luminanceShift:sanitizeNumber(`${path}.luminanceShift`,raw.luminanceShift,0),hueRange:sanitizeNumber(`${path}.hueRange`,raw.hueRange,30),saturationRange:sanitizeNumber(`${path}.saturationRange`,raw.saturationRange,25),luminanceRange:sanitizeNumber(`${path}.luminanceRange`,raw.luminanceRange,25),feather:sanitizeNumber(`${path}.feather`,raw.feather,50),range:sanitizeNumber(`${path}.range`,raw.range,30),variance:sanitizeNumber(`${path}.variance`,raw.variance,25)});
+    }
+    return result;
+  }
+  function sanitizePointColor(raw){
+    const result={enabled:false,visualize:false,activeId:'',swatches:[]};if(!raw||typeof raw!=='object'||Array.isArray(raw))return result;result.enabled=raw.enabled===true;result.visualize=raw.visualize===true;
+    if(Array.isArray(raw.swatches))result.swatches=sanitizePointColorSwatches(raw.swatches);
+    else{
+      const legacyDefaults={hue:30,hueShift:0,saturationShift:0,luminanceShift:0,variance:25,range:30},meaningful=result.enabled||result.visualize||Object.entries(legacyDefaults).some(([key,value])=>raw[key]!=null&&Number(raw[key])!==value);
+      if(meaningful)result.swatches=sanitizePointColorSwatches([{id:'pc-legacy',enabled:true,mode:'hue-v1',hue:raw.hue,hueShift:raw.hueShift,saturationShift:raw.saturationShift,luminanceShift:raw.luminanceShift,variance:raw.variance,range:raw.range}]);
+    }
+    const requested=String(raw.activeId||'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,64);result.activeId=result.swatches.some(swatch=>swatch.id===requested)?requested:result.swatches[0]?.id||'';return result;
   }
   function sanitizeArray(path,value,fallback){
     if(!Array.isArray(value))return clone(fallback);
@@ -105,16 +131,28 @@
   function safeMaskId(value,index,used){
     const seed=String(value||'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,64)||'mask-'+(index+1);let id=seed,suffix=2;while(used.has(id)){id=seed.slice(0,Math.max(1,61-String(suffix).length))+'-'+suffix;suffix++}used.add(id);return id;
   }
+  function base64ByteLength(value){
+    if(typeof value!=='string'||value.length<4||value.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(value))return-1;return value.length/4*3-(value.endsWith('==')?2:value.endsWith('=')?1:0);
+  }
+  function sanitizeSemanticMask(raw){
+    if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+    const width=Math.round(Number(raw.width)),height=Math.round(Number(raw.height)),pixels=width*height,bits=typeof raw.bits==='string'?raw.bits:'';
+    if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||width>MAX_SEMANTIC_MASK_EDGE||height>MAX_SEMANTIC_MASK_EDGE||pixels>MAX_SEMANTIC_MASK_PIXELS||base64ByteLength(bits)!==Math.ceil(pixels/8))return null;
+    const kinds=new Set(['object','subject','person','people','hair','body-skin','face-skin','clothes','accessories','background','generic','sky','landscape']);
+    const models=new Set(['object-efficient-sam-ti','people-pphumanseg','smart-sky-v1']);
+    const categories=Array.isArray(raw.categories)?[...new Set(raw.categories.slice(0,32).map(Number).filter(value=>Number.isInteger(value)&&value>=0&&value<=255))]:[];
+    return{kind:kinds.has(raw.kind)?raw.kind:'object',modelId:models.has(raw.modelId)?raw.modelId:'',modelVersion:String(raw.modelVersion||'1').replace(/[^A-Za-z0-9._-]/g,'').slice(0,32)||'1',width,height,bits,categories,threshold:Math.max(1,Math.min(99,Number.isFinite(+raw.threshold)?+raw.threshold:50)),sourceWidth:Math.max(1,Math.min(100000,Math.round(Number(raw.sourceWidth)||width))),sourceHeight:Math.max(1,Math.min(100000,Math.round(Number(raw.sourceHeight)||height)))};
+  }
   function sanitizeMaskLayer(raw,index,used,strokeBudget,legacyVersion=5){
     raw=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};const layer=defaultMaskLayer(),id=safeMaskId(raw.id,index,used);
     layer.id=id;layer.name=String(raw.name||(({subject:'Object',sky:'Sky',brush:'Brush',linear:'Linear gradient',radial:'Radial gradient'}[raw.type]||'Mask')+' '+(index+1))).slice(0,60)||('Mask '+(index+1));
     if(typeof raw.enabled==='boolean')layer.enabled=raw.enabled;
-    if(['subject','sky','brush','linear','radial'].includes(raw.type))layer.type=raw.type;if(['dodge','burn'].includes(raw.purpose))layer.purpose=raw.purpose;
+    if(['subject','object','sky','person','people','background','landscape','range','brush','linear','radial'].includes(raw.type))layer.type=raw.type;if(['dodge','burn'].includes(raw.purpose))layer.purpose=raw.purpose;
     layer.space=['source','frame'].includes(raw.space)?raw.space:(legacyVersion<4?'frame':'source');
     if(raw.legacyShape==='ellipse-v2')layer.legacyShape='ellipse-v2';if(raw.legacySampling===true||legacyVersion<5)layer.legacySampling=true;
-    for(const key of ['x','y','x2','y2','size','range','feather','brushSize','brushFeather','opacity','flow','subjectExposure','subjectClarity','backgroundExposure','backgroundBlur','skyExposure','skyTemperature','localTemperature','localTint','localSaturation','localBlur'])if(raw[key]!=null)layer[key]=sanitizeNumber('mask.'+key,raw[key],layer[key]);
+    for(const key of ['x','y','x2','y2','size','range','feather','brushSize','brushFeather','opacity','flow','rangeMin','rangeMax','rangeFeather','rangeHue','rangeSaturation','rangeLuminance','rangeAmount','subjectExposure','subjectClarity','backgroundExposure','backgroundBlur','skyExposure','skyTemperature','localContrast','localHighlights','localShadows','localWhites','localBlacks','localTemperature','localTint','localHue','localSaturation','localTexture','localClarity','localDehaze','localSharpness','localNoise','localMoire','localDefringe','localGrain','localBlur'])if(raw[key]!=null)layer[key]=sanitizeNumber('mask.'+key,raw[key],layer[key]);
     if(typeof raw.invert==='boolean')layer.invert=raw.invert;if(typeof raw.show==='boolean')layer.show=raw.show;if(typeof raw.protectTones==='boolean')layer.protectTones=raw.protectTones;
-    if(['all','shadows','midtones','highlights'].includes(raw.toneRange))layer.toneRange=raw.toneRange;if(!layer.purpose&&layer.type==='brush'&&layer.protectTones&&layer.toneRange==='midtones'){const legacyPurpose=layer.name.toLowerCase().startsWith('dodge')?'dodge':layer.name.toLowerCase().startsWith('burn')?'burn':'';if(legacyPurpose)layer.purpose=legacyPurpose}
+    if(['all','shadows','midtones','highlights'].includes(raw.toneRange))layer.toneRange=raw.toneRange;if(['none','luminance','color'].includes(raw.rangeType))layer.rangeType=raw.rangeType;if(layer.rangeMin>layer.rangeMax)[layer.rangeMin,layer.rangeMax]=[layer.rangeMax,layer.rangeMin];layer.semantic=sanitizeSemanticMask(raw.semantic);if(!layer.purpose&&layer.type==='brush'&&layer.protectTones&&layer.toneRange==='midtones'){const legacyPurpose=layer.name.toLowerCase().startsWith('dodge')?'dodge':layer.name.toLowerCase().startsWith('burn')?'burn':'';if(legacyPurpose)layer.purpose=legacyPurpose}
     const available=Math.max(0,Math.min(MAX_MASK_STROKES,MAX_TOTAL_MASK_STROKES-strokeBudget.count)),pointAvailable=Math.max(0,Math.min(MAX_MASK_POINTS_PER_LAYER,MAX_TOTAL_MASK_POINTS-strokeBudget.points));layer.strokes=sanitizeMaskStrokes(raw.strokes,available,pointAvailable);const layerPoints=layer.strokes.reduce((sum,stroke)=>sum+(stroke.kind==='path'?stroke.points.length:1),0);strokeBudget.count+=layer.strokes.length;strokeBudget.points+=layerPoints;return layer;
   }
   function legacyMaskMeaningful(raw){
@@ -132,7 +170,7 @@
   function migratedEdits(old){
     const fresh=defaultEdits();
     if(!old)return fresh;
-    const mergeSource={};for(const [key,value] of Object.entries(old))if(!BLOCKED_KEYS.has(key)&&!['masks','mask','cleanup'].includes(key))mergeSource[key]=value;deepMerge(fresh,mergeSource);
+    const mergeSource={};for(const [key,value] of Object.entries(old))if(!BLOCKED_KEYS.has(key)&&!['masks','mask','cleanup','pointColor'].includes(key))mergeSource[key]=value;deepMerge(fresh,mergeSource);fresh.pointColor=sanitizePointColor(old.pointColor);
     fresh.masks=migrateMasks(old);
     if(Array.isArray(old.cleanup))fresh.cleanup=sanitizeCleanup(old.cleanup,Number(old.version||0));
     const map={exposure:['light','exposure'],contrast:['light','contrast'],highlights:['light','highlights'],shadows:['light','shadows'],temperature:['color','temperature'],tint:['color','tint'],saturation:['color','saturation'],vignette:['effects','vignette'],grain:['effects','grain']};
@@ -157,9 +195,31 @@
   function buildLut(points){const pts=[...points].sort((a,b)=>a[0]-b[0]),lut=new Uint8ClampedArray(256);for(let x=0;x<256;x++){let i=0;while(i<pts.length-2&&x>pts[i+1][0])i++;const a=pts[i],b=pts[Math.min(i+1,pts.length-1)],t=b[0]===a[0]?0:(x-a[0])/(b[0]-a[0]);lut[x]=clamp(a[1]+(b[1]-a[1])*t,0,255)}return lut}
   function tintBlend(r,g,b,hue,sat,weight){if(sat<=0||weight<=0)return[r,g,b];const tint=hslToRgb(hue,Math.min(1,sat/100),.5),a=Math.min(.55,sat/100*.42)*weight;return[r*(1-a)+tint[0]*a,g*(1-a)+tint[1]*a,b*(1-a)+tint[2]*a]}
 
+  const semanticMaskCache=new Map();
+  function semanticMaskWeights(meta,targetWidth,targetHeight){
+    if(!meta?.bits)return null;targetWidth=Math.max(1,Math.min(meta.width,Math.round(targetWidth)));targetHeight=Math.max(1,Math.min(meta.height,Math.round(targetHeight)));const key=`${meta.width}x${meta.height}>${targetWidth}x${targetHeight}:${meta.bits}`,cached=semanticMaskCache.get(key);if(cached){semanticMaskCache.delete(key);semanticMaskCache.set(key,cached);return cached}
+    let binary;try{const decoded=atob(meta.bits);binary=new Uint8Array(decoded.length);for(let index=0;index<decoded.length;index++)binary[index]=decoded.charCodeAt(index)}catch{return null}
+    const pixels=meta.width*meta.height;if(binary.length!==Math.ceil(pixels/8))return null;const bitAt=(x,y)=>(binary[(y*meta.width+x)>>3]&(1<<((y*meta.width+x)&7)))?255:0,weights=new Uint8ClampedArray(targetWidth*targetHeight),downsample=targetWidth<meta.width||targetHeight<meta.height;
+    for(let y=0;y<targetHeight;y++)for(let x=0;x<targetWidth;x++){const target=y*targetWidth+x;if(!downsample){weights[target]=bitAt(x,y);continue}const left=Math.min(meta.width-1,Math.floor(x*meta.width/targetWidth)),right=Math.min(meta.width-1,Math.max(left,Math.ceil((x+1)*meta.width/targetWidth)-1)),top=Math.min(meta.height-1,Math.floor(y*meta.height/targetHeight)),bottom=Math.min(meta.height-1,Math.max(top,Math.ceil((y+1)*meta.height/targetHeight)-1)),centerX=Math.floor((left+right)/2),centerY=Math.floor((top+bottom)/2);weights[target]=Math.round((bitAt(left,top)+bitAt(right,top)+bitAt(left,bottom)+bitAt(right,bottom)+bitAt(centerX,centerY))/5)}
+    semanticMaskCache.set(key,weights);while(semanticMaskCache.size>8)semanticMaskCache.delete(semanticMaskCache.keys().next().value);return weights;
+  }
+  function rangeBandWeight(value,min,max,feather){
+    const soft=Math.max(.0001,feather),lower=smooth(clamp((value-(min-soft))/soft)),upper=1-smooth(clamp((value-max)/soft));return lower*upper;
+  }
+  function sampledRangeWeight(r,g,b,m){
+    if(m.rangeType==='luminance'){const lum=(.2126*r+.7152*g+.0722*b)/255;return rangeBandWeight(lum,m.rangeMin/100,m.rangeMax/100,m.rangeFeather/100)}
+    if(m.rangeType==='color'){const[h,s,l]=rgbToHsl(r/255,g/255,b/255),amount=m.rangeAmount/100,hueRadius=4+amount*88,satRadius=.08+amount*.92,lumRadius=.08+amount*.92,hueWeight=1-smooth(clamp((hueDistance(h,m.rangeHue)-hueRadius*.65)/(hueRadius*.35))),satWeight=1-smooth(clamp((Math.abs(s-m.rangeSaturation/100)-satRadius*.65)/(satRadius*.35))),lumWeight=1-smooth(clamp((Math.abs(l-m.rangeLuminance/100)-lumRadius*.65)/(lumRadius*.35)));return hueWeight*satWeight*lumWeight}
+    return 1;
+  }
+
   function buildMaskWeights(canvas,m){
-    if(!m?.enabled)return null;const width=canvas.width,height=canvas.height,maxAnalysisEdge=512,scale=Math.min(1,maxAnalysisEdge/Math.max(width,height)),smallWidth=Math.max(1,Math.round(width*scale)),smallHeight=Math.max(1,Math.round(height*scale)),small=makeCanvas(smallWidth,smallHeight),smallContext=small.getContext('2d',{willReadFrequently:true});smallContext.imageSmoothingQuality='high';smallContext.drawImage(canvas,0,0,smallWidth,smallHeight);const mask=makeCanvas(smallWidth,smallHeight),maskContext=mask.getContext('2d',{willReadFrequently:true});
-    if(m.type==='sky'){
+    if(!m?.enabled)return null;const width=canvas.width,height=canvas.height,maxAnalysisEdge=512,semanticEdge=Math.min(1024,Math.max(width,height)),semanticScale=m.semantic?Math.min(1,semanticEdge/Math.max(m.semantic.width,m.semantic.height)):1,smallWidth=m.semantic?Math.max(1,Math.round(m.semantic.width*semanticScale)):Math.max(1,Math.round(width*Math.min(1,maxAnalysisEdge/Math.max(width,height)))),smallHeight=m.semantic?Math.max(1,Math.round(m.semantic.height*semanticScale)):Math.max(1,Math.round(height*Math.min(1,maxAnalysisEdge/Math.max(width,height)))),semanticWeights=semanticMaskWeights(m.semantic,smallWidth,smallHeight),small=makeCanvas(smallWidth,smallHeight),smallContext=small.getContext('2d',{willReadFrequently:true});smallContext.imageSmoothingQuality='high';smallContext.drawImage(canvas,0,0,smallWidth,smallHeight);const mask=makeCanvas(smallWidth,smallHeight),maskContext=mask.getContext('2d',{willReadFrequently:true});
+    if(semanticWeights){
+      const image=maskContext.createImageData(smallWidth,smallHeight);for(let index=0;index<semanticWeights.length;index++){const offset=index*4;image.data[offset]=image.data[offset+1]=image.data[offset+2]=255;image.data[offset+3]=semanticWeights[index]}maskContext.putImageData(image,0,0);
+      if(m.feather>0){const softened=makeCanvas(smallWidth,smallHeight),softContext=softened.getContext('2d');softContext.filter=`blur(${.25+m.feather/100*3}px)`;softContext.drawImage(mask,0,0);maskContext.clearRect(0,0,smallWidth,smallHeight);maskContext.drawImage(softened,0,0);softened.width=softened.height=1}
+    }else if(m.type==='range'){
+      maskContext.fillStyle='#fff';maskContext.fillRect(0,0,smallWidth,smallHeight);
+    }else if(m.type==='sky'){
       const gradient=maskContext.createLinearGradient(0,0,0,smallHeight);gradient.addColorStop(0,'#fff');gradient.addColorStop(.72,'#0000');gradient.addColorStop(1,'#0000');maskContext.fillStyle=gradient;maskContext.fillRect(0,0,smallWidth,smallHeight);
     }else if(m.type==='linear'){
       const gradient=maskContext.createLinearGradient(m.x*smallWidth,m.y*smallHeight,m.x2*smallWidth,m.y2*smallHeight);gradient.addColorStop(0,'#fff');gradient.addColorStop(1,'#0000');maskContext.fillStyle=gradient;maskContext.fillRect(0,0,smallWidth,smallHeight);
@@ -181,7 +241,7 @@
       if(stroke.kind==='path'){for(const point of stroke.points||[]){const pressure=point[2]??1,sourceSize=point[3]??stroke.size,size=sourceSize*(.35+.65*pressure),flow=stroke.flow*(.25+.75*pressure);paintDab(point[0]*smallWidth,point[1]*smallHeight,size,stroke.feather,flow,stroke.mode)}}
       else paintDab(stroke.x*smallWidth,stroke.y*smallHeight,stroke.size,stroke.feather,stroke.flow??m.flow??100,stroke.mode);
     }
-    const image=maskContext.getImageData(0,0,smallWidth,smallHeight),weights=new Uint8ClampedArray(smallWidth*smallHeight);for(let index=0;index<weights.length;index++){const offset=index*4,value=image.data[offset+3],weight=m.invert?255-value:value;weights[index]=weight;if(m.invert){image.data[offset]=image.data[offset+1]=image.data[offset+2]=255;image.data[offset+3]=weight}}if(m.invert)maskContext.putImageData(image,0,0);return{data:weights,width:smallWidth,height:smallHeight,canvas:mask,nearest:!!m.legacySampling};
+    const image=maskContext.getImageData(0,0,smallWidth,smallHeight),source=m.rangeType==='none'?null:smallContext.getImageData(0,0,smallWidth,smallHeight).data,weights=new Uint8ClampedArray(smallWidth*smallHeight);for(let index=0;index<weights.length;index++){const offset=index*4,rangeWeight=source?sampledRangeWeight(source[offset],source[offset+1],source[offset+2],m):1,value=image.data[offset+3]*rangeWeight,weight=m.invert?255-value:value;weights[index]=weight;if(m.invert||source){image.data[offset]=image.data[offset+1]=image.data[offset+2]=255;image.data[offset+3]=weight}}if(m.invert||source)maskContext.putImageData(image,0,0);small.width=small.height=1;return{data:weights,width:smallWidth,height:smallHeight,canvas:mask,nearest:!!m.legacySampling};
   }
 
   function maskWeightAt(maskMap,x,y,width,height){if(!maskMap)return 0;const nearest=()=>{const mx=Math.max(0,Math.min(maskMap.width-1,Math.floor((x+.5)*maskMap.width/width))),my=Math.max(0,Math.min(maskMap.height-1,Math.floor((y+.5)*maskMap.height/height)));return maskMap.data[my*maskMap.width+mx]/255};if(maskMap.nearest)return nearest();const fx=Math.max(0,Math.min(maskMap.width-1,(x+.5)*maskMap.width/width-.5)),fy=Math.max(0,Math.min(maskMap.height-1,(y+.5)*maskMap.height/height-.5)),x0=Math.floor(fx),y0=Math.floor(fy),x1=Math.min(maskMap.width-1,x0+1),y1=Math.min(maskMap.height-1,y0+1),tx=fx-x0,ty=fy-y0,a=maskMap.data[y0*maskMap.width+x0],b=maskMap.data[y0*maskMap.width+x1],c=maskMap.data[y1*maskMap.width+x0],d=maskMap.data[y1*maskMap.width+x1];if((a===0||a===255)&&(b===0||b===255)&&(c===0||c===255)&&(d===0||d===255))return nearest();return(a+(b-a)*tx+(c-a)*ty+(d-c-b+a)*tx*ty)/255}
@@ -208,22 +268,31 @@
   function tonalMaskWeight(lum,range,protect){
     let weight=range==='shadows'?Math.pow(1-clamp(lum),2):range==='highlights'?Math.pow(clamp(lum),2):range==='midtones'?Math.pow(clamp(1-Math.abs(lum-.5)*2),1.5):1;if(protect)weight*=.3+.7*clamp(1-Math.abs(lum-.5)*1.25);return weight;
   }
+  function buildCalibrationMatrix(calibration){
+    const values=[calibration.redPrimaryHue,calibration.redPrimarySaturation,calibration.greenPrimaryHue,calibration.greenPrimarySaturation,calibration.bluePrimaryHue,calibration.bluePrimarySaturation];if(!values.some(Boolean))return null;const matrix=[[1,0,0],[0,1,0],[0,0,1]];
+    for(let primary=0;primary<3;primary++){const hue=values[primary*2],saturation=values[primary*2+1],hueAmount=Math.abs(hue)/100*.18;if(hueAmount){const target=hue>0?(primary+1)%3:(primary+2)%3;matrix[primary][primary]-=hueAmount;matrix[target][primary]+=hueAmount}if(saturation){const amount=saturation/100*.18;matrix[primary][primary]+=amount;matrix[(primary+1)%3][primary]-=amount/2;matrix[(primary+2)%3][primary]-=amount/2}}
+    for(const row of matrix){const sum=row[0]+row[1]+row[2];if(Math.abs(sum)>.000001){row[0]/=sum;row[1]/=sum;row[2]/=sum}}return matrix;
+  }
+  function softRangeWeight(distance,radius,feather){const safeRadius=Math.max(.000001,radius),soft=Math.max(.000001,safeRadius*(.05+.95*feather/100)),inner=Math.max(0,safeRadius-soft);return 1-smooth(clamp((distance-inner)/soft))}
+  function preparePointSwatches(swatches){return swatches.map(swatch=>{const hueWeights=new Float32Array(360),saturationWeights=new Float32Array(256),luminanceWeights=new Float32Array(256);for(let value=0;value<360;value++)hueWeights[value]=softRangeWeight(hueDistance(value,swatch.hue),swatch.hueRange,swatch.feather);for(let value=0;value<256;value++){const normalized=value/255;saturationWeights[value]=softRangeWeight(Math.abs(normalized-swatch.saturation/100),swatch.saturationRange/100,swatch.feather);luminanceWeights[value]=softRangeWeight(Math.abs(normalized-swatch.luminance/100),swatch.luminanceRange/100,swatch.feather)}return{...swatch,hueWeights,saturationWeights,luminanceWeights,hueDelta:swatch.hueShift*.35,saturationDelta:swatch.saturationShift/100,luminanceDelta:swatch.luminanceShift/100*.4}})}
   function applyPixels(canvas,e,maskEntries){
     const x=canvas.getContext('2d',{willReadFrequently:true}),im=x.getImageData(0,0,canvas.width,canvas.height),d=im.data,l=e.light,c=e.color,fx=e.effects,curve=e.curve;
     const luts={rgb:buildLut(curve.rgb),red:buildLut(curve.red),green:buildLut(curve.green),blue:buildLut(curve.blue)};
     const profile={"Luma Color":[0,0],"Luma Vivid":[8,12],"Luma Neutral":[-8,-10],"Luma Portrait":[-3,4],"Luma Landscape":[9,8],"Monochrome":[8,-100]}[e.profile]||[0,0];
-    const profAmount=e.profileAmount/100,contrast=(l.contrast+profile[0]*profAmount)/100,satGlobal=(c.saturation+profile[1]*profAmount)/100,exp=Math.pow(2,l.exposure),temp=c.temperature/100,tint=c.tint/100,contrastFactor=Math.pow(2,contrast*1.7),presence=(fx.clarity*.55+fx.texture*.25)/100,toneActive=!!(l.shadows||l.highlights||l.blacks||l.whites),mixerActive=COLORS.some(name=>{const value=e.mixer[name];return value.hue||value.saturation||value.luminance}),defringeActive=!!(e.optics.removeCA||e.optics.defringePurple||e.optics.defringeGreen),hslActive=!!(curve.refineSaturation||mixerActive||e.pointColor.enabled||defringeActive||c.vibrance||satGlobal||e.bw||e.profile==='Monochrome'),gradingActive=['shadows','midtones','highlights','global'].some(name=>e.grading[name].saturation||e.grading[name].luminance),vignetteActive=!!(fx.vignette||(e.optics.lensCorrections&&e.optics.lensVignette));
+    const pointColor=e.pointColor,pointSwatches=pointColor.enabled?pointColor.swatches.filter(swatch=>swatch.enabled):[],preparedPointSwatches=pointSwatches.length>1||pointSwatches[0]?.mode!=='hue-v1'?preparePointSwatches(pointSwatches):pointSwatches,calibration=e.calibration,calibrationMatrix=buildCalibrationMatrix(calibration),profAmount=e.profileAmount/100,contrast=(l.contrast+profile[0]*profAmount)/100,satGlobal=(c.saturation+profile[1]*profAmount)/100,exp=Math.pow(2,l.exposure),temp=c.temperature/100,tint=c.tint/100,contrastFactor=Math.pow(2,contrast*1.7),presence=(fx.clarity*.55+fx.texture*.25)/100,toneActive=!!(l.shadows||l.highlights||l.blacks||l.whites),mixerActive=COLORS.some(name=>{const value=e.mixer[name];return value.hue||value.saturation||value.luminance}),defringeActive=!!(e.optics.removeCA||e.optics.defringePurple||e.optics.defringeGreen),hslActive=!!(curve.refineSaturation||mixerActive||pointSwatches.length||defringeActive||c.vibrance||satGlobal||e.bw||e.profile==='Monochrome'),gradingActive=['shadows','midtones','highlights','global'].some(name=>e.grading[name].saturation||e.grading[name].luminance),vignetteActive=!!(fx.vignette||(e.optics.lensCorrections&&e.optics.lensVignette));
     for(let i=0,p=0;i<d.length;i+=4,p++){
       let r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255;
       if(exp!==1){r*=exp;g*=exp;b*=exp}
       if(temp||tint){r+=temp*.12+tint*.025;b-=temp*.12+tint*.025;g-=tint*.065}
+      if(calibrationMatrix){const red=calibrationMatrix[0][0]*r+calibrationMatrix[0][1]*g+calibrationMatrix[0][2]*b,green=calibrationMatrix[1][0]*r+calibrationMatrix[1][1]*g+calibrationMatrix[1][2]*b,blue=calibrationMatrix[2][0]*r+calibrationMatrix[2][1]*g+calibrationMatrix[2][2]*b;r=red;g=green;b=blue}
+      if(calibration.shadowTint){const calibrationLum=.2126*r+.7152*g+.0722*b,amount=calibration.shadowTint/100*.06*Math.pow(1-clamp(calibrationLum),2);r+=amount;b+=amount;g-=amount*.39821}
       let lum=.2126*r+.7152*g+.0722*b;
       if(toneActive){const shadowW=Math.pow(1-clamp(lum),2),highlightW=Math.pow(clamp(lum),2),tonal=l.shadows/100*.42*shadowW+l.highlights/100*.42*highlightW+l.blacks/100*.28*Math.pow(1-clamp(lum),5)+l.whites/100*.28*Math.pow(clamp(lum),5);r+=tonal;g+=tonal;b+=tonal}
       if(contrastFactor!==1){r=(r-.5)*contrastFactor+.5;g=(g-.5)*contrastFactor+.5;b=(b-.5)*contrastFactor+.5}
       if(fx.dehaze){const hz=fx.dehaze/100;r=(r-.48)*(1+hz*.65)+.48;g=(g-.48)*(1+hz*.65)+.48;b=(b-.48)*(1+hz*.65)+.48}
       if(presence){const local=(lum-.5)*presence*.28;r+=local;g+=local;b+=local}
       r=luts.red[luts.rgb[Math.round(clamp(r)*255)]]/255;g=luts.green[luts.rgb[Math.round(clamp(g)*255)]]/255;b=luts.blue[luts.rgb[Math.round(clamp(b)*255)]]/255;
-      if(hslActive){let[h,s,ll]=rgbToHsl(clamp(r),clamp(g),clamp(b));if(curve.refineSaturation)s=clamp(s+curve.refineSaturation/100*s*(1-s)*.65);if(mixerActive){let hueShift=0,satShift=0,lumShift=0,weightTotal=0;for(const name of COLORS){const dist=hueDistance(h,HUE_CENTERS[name]),weight=Math.pow(clamp(1-dist/52),2);if(weight){const q=e.mixer[name];hueShift+=q.hue*.35*weight;satShift+=q.saturation/100*weight;lumShift+=q.luminance/100*.38*weight;weightTotal+=weight}}if(weightTotal){h+=hueShift/Math.max(1,weightTotal);s=clamp(s+satShift/Math.max(1,weightTotal)*(1-s*.35));ll=clamp(ll+lumShift/Math.max(1,weightTotal))}}const pc=e.pointColor;if(pc.enabled){const width=6+pc.range*.75,pw=Math.pow(clamp(1-hueDistance(h,pc.hue)/width),.6+pc.variance/40);h+=pc.hueShift*.35*pw;s=clamp(s+pc.saturationShift/100*pw);ll=clamp(ll+pc.luminanceShift/100*.4*pw);if(pc.visualize&&pw<.08)s=0}if(defringeActive){const purple=hueDistance(h,292)<34,green=hueDistance(h,120)<28,reduce=(e.optics.removeCA?12:0)+(purple?e.optics.defringePurple*.55:0)+(green?e.optics.defringeGreen*.55:0);s*=1-clamp(reduce/100,0,.8)}const vib=c.vibrance/100;s=clamp(s+vib*(1-s)*(.8-Math.max(0,(hueDistance(h,25)<22?.25:0)))+satGlobal*s);if(e.bw||e.profile==='Monochrome')s=0;[r,g,b]=hslToRgb(h,s,ll)}lum=.2126*r+.7152*g+.0722*b;
+      if(hslActive){let[h,s,ll]=rgbToHsl(clamp(r),clamp(g),clamp(b));if(curve.refineSaturation)s=clamp(s+curve.refineSaturation/100*s*(1-s)*.65);if(mixerActive){let hueShift=0,satShift=0,lumShift=0,weightTotal=0;for(const name of COLORS){const dist=hueDistance(h,HUE_CENTERS[name]),weight=Math.pow(clamp(1-dist/52),2);if(weight){const q=e.mixer[name];hueShift+=q.hue*.35*weight;satShift+=q.saturation/100*weight;lumShift+=q.luminance/100*.38*weight;weightTotal+=weight}}if(weightTotal){h+=hueShift/Math.max(1,weightTotal);s=clamp(s+satShift/Math.max(1,weightTotal)*(1-s*.35));ll=clamp(ll+lumShift/Math.max(1,weightTotal))}}if(pointSwatches.length){const sourceHue=h,sourceSaturation=s,sourceLuminance=ll;if(pointSwatches.length===1&&pointSwatches[0].mode==='hue-v1'){const swatch=pointSwatches[0],width=6+swatch.range*.75,weight=Math.pow(clamp(1-hueDistance(sourceHue,swatch.hue)/width),.6+swatch.variance/40);h+=swatch.hueShift*.35*weight;s=clamp(s+swatch.saturationShift/100*weight);ll=clamp(ll+swatch.luminanceShift/100*.4*weight);if(pointColor.visualize&&weight<.08)s=0}else{let hueDelta=0,saturationDelta=0,luminanceDelta=0,totalWeight=0,strongest=0;const hueIndex=Math.round(((sourceHue%360)+360)%360)%360,saturationIndex=Math.max(0,Math.min(255,Math.round(sourceSaturation*255))),luminanceIndex=Math.max(0,Math.min(255,Math.round(sourceLuminance*255)));for(const swatch of preparedPointSwatches){let hueWeight=swatch.hueWeights[hueIndex];hueWeight=1-(1-hueWeight)*clamp(sourceSaturation/.12);const weight=Math.cbrt(hueWeight*swatch.saturationWeights[saturationIndex]*swatch.luminanceWeights[luminanceIndex]);if(weight<=0)continue;hueDelta+=swatch.hueDelta*weight;saturationDelta+=swatch.saturationDelta*weight;luminanceDelta+=swatch.luminanceDelta*weight;totalWeight+=weight;strongest=Math.max(strongest,weight)}if(totalWeight){const normalize=strongest/totalWeight;h+=hueDelta*normalize;s=clamp(s+saturationDelta*normalize);ll=clamp(ll+luminanceDelta*normalize)}if(pointColor.visualize&&strongest<.08)s=0}}if(defringeActive){const purple=hueDistance(h,292)<34,green=hueDistance(h,120)<28,reduce=(e.optics.removeCA?12:0)+(purple?e.optics.defringePurple*.55:0)+(green?e.optics.defringeGreen*.55:0);s*=1-clamp(reduce/100,0,.8)}const vib=c.vibrance/100;s=clamp(s+vib*(1-s)*(.8-Math.max(0,(hueDistance(h,25)<22?.25:0)))+satGlobal*s);if(e.bw||e.profile==='Monochrome')s=0;[r,g,b]=hslToRgb(h,s,ll)}lum=.2126*r+.7152*g+.0722*b;
       if(gradingActive){const bal=e.grading.balance/100,blend=.5+e.grading.blending/200,sw=clamp((.58+bal*.2-lum)/blend),hw=clamp((lum-(.42+bal*.2))/blend),mw=clamp(1-Math.abs(lum-.5)*2);[r,g,b]=tintBlend(r,g,b,e.grading.shadows.hue,e.grading.shadows.saturation,sw);[r,g,b]=tintBlend(r,g,b,e.grading.midtones.hue,e.grading.midtones.saturation,mw);[r,g,b]=tintBlend(r,g,b,e.grading.highlights.hue,e.grading.highlights.saturation,hw);[r,g,b]=tintBlend(r,g,b,e.grading.global.hue,e.grading.global.saturation,1);const gradeLum=(e.grading.shadows.luminance*sw+e.grading.midtones.luminance*mw+e.grading.highlights.luminance*hw+e.grading.global.luminance)/100*.18;r+=gradeLum;g+=gradeLum;b+=gradeLum}
       const px=p%canvas.width,py=Math.floor(p/canvas.width);for(const entry of maskEntries){const m=entry.layer,opacity=m.opacity/100,rawW=maskWeightAt(entry.map,px,py,canvas.width,canvas.height),inside=rawW*opacity*tonalMaskWeight(lum,m.toneRange,m.protectTones),outside=(1-rawW)*opacity,localExp=(m.subjectExposure+(m.type==='sky'?m.skyExposure:0))*inside+(m.type==='sky'?0:m.backgroundExposure*outside);if(localExp){const localScale=Math.pow(2,localExp);r*=localScale;g*=localScale;b*=localScale}const localTemp=(m.localTemperature+(m.type==='sky'?m.skyTemperature:0))/100*inside,localTint=m.localTint/100*inside;if(localTemp||localTint){r+=localTemp*.12+localTint*.025;b-=localTemp*.12+localTint*.025;g-=localTint*.065}if(m.localSaturation){const currentLum=.2126*r+.7152*g+.0722*b,sat=1+m.localSaturation/100*inside;r=currentLum+(r-currentLum)*sat;g=currentLum+(g-currentLum)*sat;b=currentLum+(b-currentLum)*sat}if(m.subjectClarity){const boost=m.subjectClarity/100*inside*(lum-.5)*.32;r+=boost;g+=boost;b+=boost}}
       if(vignetteActive){const nx=px/canvas.width*2-1,ny=(py/canvas.height*2-1)*(1+fx.vignetteRoundness/150),radius=Math.sqrt(nx*nx+ny*ny),mid=.2+fx.vignetteMidpoint/100*.65,feather=Math.max(.05,fx.vignetteFeather/100),vw=smooth(clamp((radius-mid)/feather));let vignette=fx.vignette/100*vw*.7;if(e.optics.lensCorrections)vignette-=e.optics.lensVignette/100*vw*.45;if(vignette<0){const preserve=clamp(lum)*fx.vignetteHighlights/100,dark=-vignette*(1-preserve*.85);r*=1-dark;g*=1-dark;b*=1-dark}else{r+=vignette;g+=vignette;b+=vignette}}
@@ -234,18 +303,24 @@
   }
 
   function applyLocalPixels(canvas,entries){
-    if(!entries.length)return;const context=canvas.getContext('2d',{willReadFrequently:true}),image=context.getImageData(0,0,canvas.width,canvas.height),pixels=image.data;
+    if(!entries.length)return;const context=canvas.getContext('2d',{willReadFrequently:true}),image=context.getImageData(0,0,canvas.width,canvas.height),pixels=image.data,source=new Uint8ClampedArray(pixels),needsNeighborhood=entries.some(entry=>entry.layer.localTexture||entry.layer.localSharpness||entry.layer.localNoise);
     for(let offset=0,pixel=0;offset<pixels.length;offset+=4,pixel++){
-      let r=pixels[offset]/255,g=pixels[offset+1]/255,b=pixels[offset+2]/255,lum=.2126*r+.7152*g+.0722*b;const x=pixel%canvas.width,y=Math.floor(pixel/canvas.width);
+      let r=pixels[offset]/255,g=pixels[offset+1]/255,b=pixels[offset+2]/255,lum=.2126*r+.7152*g+.0722*b,sharpAmount=0,noiseAmount=0,textureAmount=0;const x=pixel%canvas.width,y=Math.floor(pixel/canvas.width);
       for(const entry of entries){
         const m=entry.layer,opacity=m.opacity/100,rawWeight=maskWeightAt(entry.map,x,y,canvas.width,canvas.height),inside=rawWeight*opacity*tonalMaskWeight(lum,m.toneRange,m.protectTones),outside=(1-rawWeight)*opacity,localExposure=(m.subjectExposure+(m.type==='sky'?m.skyExposure:0))*inside+(m.type==='sky'?0:m.backgroundExposure*outside);
         if(localExposure){const scale=Math.pow(2,localExposure);r*=scale;g*=scale;b*=scale}
+        if(m.localHighlights||m.localShadows||m.localWhites||m.localBlacks){const shadowWeight=Math.pow(1-clamp(lum),2),highlightWeight=Math.pow(clamp(lum),2),tone=(m.localShadows/100*.42*shadowWeight+m.localHighlights/100*.42*highlightWeight+m.localBlacks/100*.28*Math.pow(1-clamp(lum),5)+m.localWhites/100*.28*Math.pow(clamp(lum),5))*inside;r+=tone;g+=tone;b+=tone}
+        if(m.localContrast){const factor=Math.pow(2,m.localContrast/100*inside*1.7);r=(r-.5)*factor+.5;g=(g-.5)*factor+.5;b=(b-.5)*factor+.5}
+        if(m.localDehaze){const amount=m.localDehaze/100*inside;r=(r-.48)*(1+amount*.65)+.48;g=(g-.48)*(1+amount*.65)+.48;b=(b-.48)*(1+amount*.65)+.48}
         const localTemperature=(m.localTemperature+(m.type==='sky'?m.skyTemperature:0))/100*inside,localTint=m.localTint/100*inside;
         if(localTemperature||localTint){r+=localTemperature*.12+localTint*.025;b-=localTemperature*.12+localTint*.025;g-=localTint*.065}
-        if(m.localSaturation){const currentLum=.2126*r+.7152*g+.0722*b,saturation=1+m.localSaturation/100*inside;r=currentLum+(r-currentLum)*saturation;g=currentLum+(g-currentLum)*saturation;b=currentLum+(b-currentLum)*saturation}
-        if(m.subjectClarity){const boost=m.subjectClarity/100*inside*(lum-.5)*.32;r+=boost;g+=boost;b+=boost}
+        if(m.localHue||m.localSaturation||m.localMoire||m.localDefringe){let[h,s,l]=rgbToHsl(clamp(r),clamp(g),clamp(b));h+=m.localHue*inside;s=clamp(s+m.localSaturation/100*inside*(1-s*.3));if(m.localMoire)s*=1-m.localMoire/100*inside*.45;if(m.localDefringe&&(hueDistance(h,292)<34||hueDistance(h,120)<28))s*=1-m.localDefringe/100*inside*.8;[r,g,b]=hslToRgb(h,s,l)}
+        const clarity=(m.subjectClarity+m.localClarity)/100*inside;if(clarity){const boost=clarity*(lum-.5)*.32;r+=boost;g+=boost;b+=boost}
+        sharpAmount+=m.localSharpness/100*inside;noiseAmount+=m.localNoise/100*inside;textureAmount+=m.localTexture/100*inside;
+        if(m.localGrain){const seed=((x*73856093)^(y*19349663)^(entry.layer.id.length*83492791))>>>0,grain=((seed%997)/996-.5)*m.localGrain/100*inside*.2;r+=grain;g+=grain;b+=grain}
         lum=.2126*r+.7152*g+.0722*b;
       }
+      if(needsNeighborhood&&x>0&&y>0&&x<canvas.width-1&&y<canvas.height-1){const left=offset-4,right=offset+4,up=offset-canvas.width*4,down=offset+canvas.width*4;for(let channel=0;channel<3;channel++){const average=(source[left+channel]+source[right+channel]+source[up+channel]+source[down+channel])/4/255,current=channel===0?r:channel===1?g:b,edge=current-average;let value=current;if(noiseAmount)value=value*(1-clamp(noiseAmount)*.75)+average*clamp(noiseAmount)*.75;if(sharpAmount||textureAmount)value+=edge*(clamp(sharpAmount)*1.4+textureAmount*.65);if(channel===0)r=value;else if(channel===1)g=value;else b=value}}
       pixels[offset]=clamp(r)*255;pixels[offset+1]=clamp(g)*255;pixels[offset+2]=clamp(b)*255;
     }
     context.putImageData(image,0,0);
@@ -264,7 +339,7 @@
       const cx=spot.x*canvas.width,cy=spot.y*canvas.height;
       if(spot.kind==='legacy-v2'){const radius=Math.max(4,spot.size/100*canvas.width);context.save();context.beginPath();context.arc(cx,cy,radius,0,Math.PI*2);context.clip();context.globalAlpha=.88;context.drawImage(src,cx+radius*.8,cy-radius,radius*2,radius*2,cx-radius,cy-radius,radius*2,radius*2);context.restore();continue}
       const mappedRadius=Array.isArray(spot.radiusVectors)?spot.radiusVectors.reduce((sum,vector)=>sum+Math.hypot(vector[0]*canvas.width,vector[1]*canvas.height),0)/spot.radiusVectors.length:0,r=Math.max(3,mappedRadius||spot.size/100*canvas.width),opacity=spot.opacity/100;
-      if(spot.kind==='red-eye'){const left=Math.max(0,Math.floor(cx-r)),top=Math.max(0,Math.floor(cy-r)),right=Math.min(canvas.width,Math.ceil(cx+r)),bottom=Math.min(canvas.height,Math.ceil(cy+r)),width=right-left,height=bottom-top;if(width<1||height<1)continue;const image=context.getImageData(left,top,width,height),data=image.data;for(let y=0;y<height;y++)for(let x=0;x<width;x++){const nx=(left+x-cx)/r,ny=(top+y-cy)/r,distance=Math.hypot(nx,ny);if(distance>=1)continue;const offset=(y*width+x)*4,red=data[offset],green=data[offset+1],blue=data[offset+2],brightness=(red+green+blue)/3;if(brightness>235||red<green*1.12||red<blue*1.12)continue;const edge=smooth(clamp((1-distance)*4)),amount=edge*opacity*spot.pupilSize/100,target=(green+blue)/2,darken=1-spot.darken/100*.65*amount;data[offset]=(red*(1-amount)+target*amount)*darken;data[offset+1]=green*darken;data[offset+2]=blue*darken}context.putImageData(image,left,top);continue}
+      if(spot.kind==='red-eye'||spot.kind==='pet-eye'){const pet=spot.kind==='pet-eye',left=Math.max(0,Math.floor(cx-r)),top=Math.max(0,Math.floor(cy-r)),right=Math.min(canvas.width,Math.ceil(cx+r)),bottom=Math.min(canvas.height,Math.ceil(cy+r)),width=right-left,height=bottom-top;if(width<1||height<1)continue;const image=context.getImageData(left,top,width,height),data=image.data;for(let y=0;y<height;y++)for(let x=0;x<width;x++){const nx=(left+x-cx)/r,ny=(top+y-cy)/r,distance=Math.hypot(nx,ny);if(distance>=1)continue;const offset=(y*width+x)*4,red=data[offset],green=data[offset+1],blue=data[offset+2],maximum=Math.max(red,green,blue),minimum=Math.min(red,green,blue),brightness=(red+green+blue)/3,saturation=maximum?1-minimum/maximum:0;if(brightness>242)continue;const reflection=pet?(green>red*1.08||blue>red*1.08||brightness>135&&saturation>.16):(red>=green*1.12&&red>=blue*1.12);if(!reflection)continue;const edge=smooth(clamp((1-distance)*4)),amount=edge*opacity*spot.pupilSize/100,neutral=pet?Math.min(red,green,blue):(green+blue)/2,darken=1-spot.darken/100*(pet?.76:.65)*amount;data[offset]=(red*(1-amount)+neutral*amount)*darken;data[offset+1]=(green*(1-amount)+neutral*amount)*darken;data[offset+2]=(blue*(1-amount)+neutral*amount)*darken}context.putImageData(image,left,top);continue}
       const sx=(spot.sourceX==null?clamp(spot.x+spot.size/100*2.2):spot.sourceX)*canvas.width,sy=(spot.sourceY==null?spot.y:spot.sourceY)*canvas.height,diameter=Math.max(2,Math.ceil(r*2)),destinationX=cx-r,destinationY=cy-r,left=Math.max(0,Math.floor(destinationX)),top=Math.max(0,Math.floor(destinationY)),right=Math.min(canvas.width,Math.ceil(destinationX+diameter)),bottom=Math.min(canvas.height,Math.ceil(destinationY+diameter)),patchWidth=right-left,patchHeight=bottom-top;
       if(patchWidth<1||patchHeight<1)continue;if(patchWidth>MAX_CANVAS_EDGE||patchHeight>MAX_CANVAS_EDGE||patchWidth*patchHeight>MAX_CANVAS_PIXELS)throw new RangeError('A repair region is too large to process safely. Reduce its size.');
       const patch=makeCanvas(patchWidth,patchHeight),patchContext=patch.getContext('2d'),offsetX=left-destinationX,offsetY=top-destinationY;patchContext.drawImage(src,sx-r+offsetX,sy-r+offsetY,patchWidth,patchHeight,0,0,patchWidth,patchHeight);patchContext.globalCompositeOperation='destination-in';
@@ -273,7 +348,7 @@
     }src.width=src.height=1
   }
   function addWatermark(canvas,text){if(!text)return;const x=canvas.getContext('2d'),size=Math.max(14,Math.round(canvas.width/55));x.font=`600 ${size}px Segoe UI`;x.textAlign='right';x.textBaseline='bottom';x.fillStyle='#0009';x.fillText(text,canvas.width-size+2,canvas.height-size+2);x.fillStyle='#fffddd';x.fillText(text,canvas.width-size,canvas.height-size)}
-  function layerHasEffect(m){return!!(m.subjectExposure||m.subjectClarity||m.backgroundExposure||m.backgroundBlur||m.skyExposure||m.skyTemperature||m.localTemperature||m.localTint||m.localSaturation||m.localBlur)}
+  function layerHasEffect(m){return!!(m.subjectExposure||m.subjectClarity||m.backgroundExposure||m.backgroundBlur||m.skyExposure||m.skyTemperature||m.localContrast||m.localHighlights||m.localShadows||m.localWhites||m.localBlacks||m.localTemperature||m.localTint||m.localHue||m.localSaturation||m.localTexture||m.localClarity||m.localDehaze||m.localSharpness||m.localNoise||m.localMoire||m.localDefringe||m.localGrain||m.localBlur)}
   function cleanupForOutput(image,e){
     const naturalWidth=image.naturalWidth||image.width,naturalHeight=image.naturalHeight||image.height,rotation=((e.geometry.rotation90%360)+360)%360,swap=rotation===90||rotation===270,width=swap?naturalHeight:naturalWidth,height=swap?naturalWidth:naturalHeight;
     return{...e,cleanup:e.cleanup.map(spot=>{
@@ -285,7 +360,7 @@
   function render(image,edits,{maxEdge=1500,watermark='',visualizeMask=false}={}){
     const e=migratedEdits(edits),oriented=orientedSource(image,e,maxEdge),canvas=transformAndCrop(oriented,e),active=e.masks.layers.find(layer=>layer.id===e.masks.activeId),entries=[];
     for(const layer of [...e.masks.layers].reverse()){
-      const overlay=visualizeMask&&active===layer&&layer.show;if(!layer.enabled&&!overlay)continue;if(!layerHasEffect(layer)&&!overlay)continue;let map=buildMaskWeights(layer.space==='source'?oriented:canvas,layer);if(map&&layer.space==='source')map=transformMaskMap(map,e);if(map)entries.push({layer,map})
+      const overlay=visualizeMask&&active===layer&&layer.show;if(!layer.enabled&&!overlay)continue;if(!layerHasEffect(layer)&&!overlay)continue;let map=buildMaskWeights(layer.space==='source'?oriented:canvas,layer);if(map&&layer.space==='source'){const sourceMap=map;map=transformMaskMap(sourceMap,e);if(sourceMap.canvas&&sourceMap.canvas!==map.canvas)sourceMap.canvas.width=sourceMap.canvas.height=1}if(map){if(!layer.backgroundBlur&&!layer.localBlur&&map.canvas){map.canvas.width=map.canvas.height=1;map.canvas=null}entries.push({layer,map})}
     }
     applyPixels(canvas,e,[]);applyDetail(canvas,e);
     const effectEntries=entries.filter(entry=>entry.layer.enabled&&layerHasEffect(entry.layer));let segment=[];
@@ -296,5 +371,5 @@
 
   async function analyze(image){const max=180,s=Math.min(1,max/Math.max(image.naturalWidth||image.width,image.naturalHeight||image.height)),c=makeCanvas(Math.max(1,Math.round((image.naturalWidth||image.width)*s)),Math.max(1,Math.round((image.naturalHeight||image.height)*s)));const x=c.getContext('2d',{willReadFrequently:true});if(!x)throw new Error('Image analysis canvas is unavailable');x.drawImage(image,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height).data;let lum=0,lap=0,count=0;const gray=new Float32Array(c.width*c.height);for(let i=0,p=0;i<d.length;i+=4,p++){gray[p]=.2126*d[i]+.7152*d[i+1]+.0722*d[i+2];lum+=gray[p]}for(let y=1;y<c.height-1;y++)for(let xx=1;xx<c.width-1;xx++){const i=y*c.width+xx,v=Math.abs(gray[i]*4-gray[i-1]-gray[i+1]-gray[i-c.width]-gray[i+c.width]);lap+=v;count++}lum=gray.length?lum/gray.length/255:0;const sharpness=count?lap/count:0;let issue='';if(sharpness<7)issue='Low detail / possible blur';else if(lum<.16)issue='Underexposed';else if(lum>.88)issue='Overexposed';return{sharpness:+sharpness.toFixed(1),exposure:+lum.toFixed(2),issue,score:Math.round(clamp(sharpness/24)*70+clamp(1-Math.abs(lum-.5)*1.5)*30)}}
 
-  globalThis.LumaEngine={COLORS,HUE_CENTERS,defaultEdits,defaultMaskLayer,migratedEdits,migratePhoto,deepMerge,clone,render,analyze,buildLut,rgbToHsl,outputPointToSource,outputPointToSourcePrepared,sourcePointToOutput};
+  globalThis.LumaEngine={EDIT_SCHEMA_VERSION,COLORS,HUE_CENTERS,defaultEdits,defaultMaskLayer,migratedEdits,migratePhoto,deepMerge,clone,render,analyze,buildLut,rgbToHsl,outputPointToSource,outputPointToSourcePrepared,sourcePointToOutput};
 })();

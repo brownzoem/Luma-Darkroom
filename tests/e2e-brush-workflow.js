@@ -28,7 +28,9 @@ async function waitForPreview(page) {
   page.on('pageerror', error => errors.push(String(error)));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.waitForSelector('body');
-  if (await page.locator('#tutorialDialog[open]').count()) await page.click('#tutorialSkip');
+  await page.locator('#tutorialDialog[open]').waitFor({ state: 'visible', timeout: 5000 });
+  await page.click('#tutorialSkip');
+  await page.locator('#tutorialDialog').waitFor({ state: 'hidden' });
   await page.evaluate(filePath => {
     photos = [E.migratePhoto({ id: 'brush-workflow-photo', filePath, name: 'brush-workflow.jpg', importedAt: Date.now() })];
     updateLibrary();
@@ -166,21 +168,15 @@ async function waitForPreview(page) {
 
   await page.evaluate(() => applyZoom(200, { render: false, recalculate: true }));
   await page.waitForTimeout(100);
-  await page.evaluate(() => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', bubbles: true }));
-    canvas.focus();
-    updateKeyboardCanvasCursor();
-  });
+  await page.evaluate(() => canvas.focus());
+  await page.keyboard.press('ArrowRight');
   const cursorBeforePan = await page.evaluate(() => !keyboardCanvasCursor.classList.contains('hidden'));
   const pointsBeforePan = await page.evaluate(() => activeMask().strokes.reduce((sum, stroke) => sum + (stroke.points?.length || 0), 0));
   const wrapBox = await page.locator('#canvasWrap').boundingBox();
   await page.mouse.move(wrapBox.x + wrapBox.width * .6, wrapBox.y + wrapBox.height * .6);
   const cursorAfterMouseMove = await page.evaluate(() => keyboardCanvasCursor.classList.contains('hidden'));
-  await page.evaluate(() => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', bubbles: true }));
-    canvas.focus();
-    updateKeyboardCanvasCursor();
-  });
+  await page.evaluate(() => canvas.focus());
+  await page.keyboard.press('ArrowLeft');
   await page.keyboard.down('Space');
   const cursorDuringPan = await page.evaluate(() => !keyboardCanvasCursor.classList.contains('hidden') || !brushCursor.classList.contains('hidden'));
   await page.mouse.move(wrapBox.x + wrapBox.width * .65, wrapBox.y + wrapBox.height * .65);

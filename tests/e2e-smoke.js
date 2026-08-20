@@ -31,10 +31,12 @@ async function launch(){
   page.on('pageerror',e=>errors.push(`PAGE: ${e.stack||e}`));
   page.on('console',m=>{if(m.type()==='error')errors.push(`CONSOLE: ${m.text()}`)});
   await page.waitForSelector('body',{timeout:15000});mark('body');
-  if (await page.locator('#tutorialDialog[open]').count()) {
-    await page.click('#tutorialSkip');
-    await page.locator('#tutorialDialog').waitFor({ state: 'hidden' });
-  }
+  // A clean profile schedules the first-run tutorial after startup. Wait for the
+  // scheduled dialog instead of racing it; otherwise it can open later and
+  // intercept unrelated controls during the smoke test on a slower CI runner.
+  await page.locator('#tutorialDialog[open]').waitFor({ state: 'visible', timeout: 5000 });
+  await page.click('#tutorialSkip');
+  await page.locator('#tutorialDialog').waitFor({ state: 'hidden' });
   await page.evaluate(paths=>{
     const catalog=paths.map((filePath,i)=>({id:`test-${i}`,filePath,name:filePath.split('\\').pop(),importedAt:Date.now()-i*1000,rating:i,flag:i===1?'pick':'none',label:i===2?'blue':'',tags:i===0?['wallpaper','windows']:[],caption:'',edits:null}));
     localStorage.setItem('luma-catalog-v2',JSON.stringify(catalog));

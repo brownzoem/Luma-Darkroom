@@ -9,7 +9,12 @@ artifact is safe, or replace legal, security, or platform review.
 - Confirm release authority under [Governance](../GOVERNANCE.md).
 - Review open correctness, data-loss, security, privacy, and dependency issues.
 - Ensure the worktree contains only intended release changes.
-- Update **package.json** and **package-lock.json** to the same semantic version.
+- Update every current-version surface together: **package.json**,
+  **package-lock.json**, the in-app Help/About copy in **src/index.html**,
+  **docs/PRIVACY.md**, **docs/SECURITY_MODEL.md**,
+  **third_party/NATIVE_SOURCE_MANIFEST.json**, and the versioned filenames in
+  **third_party/SOURCE_AVAILABILITY.md**. Refresh
+  **third_party/SHA256SUMS** after changing the native-source manifest.
 - Update [Changelog](../CHANGELOG.md) with the release date and user-visible
   changes.
 - Re-read [Privacy](PRIVACY.md), [Security model](SECURITY_MODEL.md),

@@ -5,6 +5,8 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+## 2.3.0 - 2026-08-19
+
 ### Added
 
 - Pressure-aware, geometrically resampled brush paths with immediate visual

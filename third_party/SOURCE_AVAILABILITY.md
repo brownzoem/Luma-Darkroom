@@ -16,10 +16,10 @@ labels are not substitutes for the complete texts.
 `NATIVE_SOURCE_MANIFEST.json` pins the immutable retrieval URL, byte size, and
 SHA-256 value of each retained source snapshot for this release. Running
 `npm run build:native-source` downloads and verifies those sources, then creates
-`Luma-Darkroom-2.2.0-Native-Corresponding-Source.zip`. The release archive
+`Luma-Darkroom-2.3.0-Native-Corresponding-Source.zip`. The release archive
 contains all reported LGPL-family component sources, Cairo source, matching
 Windows build recipes and patches, matching native packaging recipes, and the
-sharp source. Publish that archive next to every 2.2.0 Windows installer and
+sharp source. Publish that archive next to every 2.3.0 Windows installer and
 keep it available for as long as the binary is offered.
 
 ## Corresponding source locations

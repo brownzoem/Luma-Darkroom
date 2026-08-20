@@ -357,6 +357,31 @@ test('IDs, manifest filenames, storage roots, and symlink leaves cannot escape s
   assert.equal(await fs.promises.readFile(outside, 'utf8'), 'outside must remain');
 });
 
+test('a real storage leaf below a resolved ancestor junction remains usable', async t => {
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'luma-model-parent-link-'));
+  t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
+  const targetParent = path.join(root, 'real-parent');
+  const linkedParent = path.join(root, 'linked-parent');
+  await fs.promises.mkdir(targetParent);
+  try {
+    await fs.promises.symlink(targetParent, linkedParent, process.platform === 'win32' ? 'junction' : 'dir');
+  } catch (error) {
+    if (error.code === 'EPERM' || error.code === 'EACCES') {
+      t.skip('Directory symlinks are unavailable in this environment');
+      return;
+    }
+    throw error;
+  }
+
+  const manager = new ModelManager({
+    baseDir: path.join(linkedParent, 'ai-models'),
+    manifest: testManifest(),
+    fetchImpl: async () => responseFor(GOOD_BYTES)
+  });
+  assert.equal((await manager.download(TEST_ID)).state, 'available');
+  assert.deepEqual(Buffer.from((await manager.get(TEST_ID)).buffer), GOOD_BYTES);
+});
+
 test('a symlinked storage root is rejected', async t => {
   const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'luma-model-root-link-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));

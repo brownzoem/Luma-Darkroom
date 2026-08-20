@@ -213,8 +213,16 @@ class ModelManager extends EventEmitter {
       if (stat.isSymbolicLink() || !stat.isDirectory()) {
         throw managerError('MODEL_STORAGE_UNSAFE', 'Model storage directory is unsafe');
       }
-      const real = await fs.promises.realpath(this._baseDir);
-      if (normalizedPath(real) !== normalizedPath(this._baseDir)) {
+      // Windows temp and user-profile directories can legitimately live below
+      // junctions or use an 8.3 alias. Resolve the parent first so those safe
+      // ancestors do not make the model directory look like a redirected leaf.
+      // The lstat above still rejects a symlink/junction at the storage leaf.
+      const [real, realParent] = await Promise.all([
+        fs.promises.realpath(this._baseDir),
+        fs.promises.realpath(path.dirname(this._baseDir))
+      ]);
+      const expected = path.join(realParent, path.basename(this._baseDir));
+      if (normalizedPath(real) !== normalizedPath(expected)) {
         throw managerError('MODEL_STORAGE_UNSAFE', 'Model storage directory is unsafe');
       }
     } catch (error) {

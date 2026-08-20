@@ -36,9 +36,13 @@ Run syntax checks:
 
     node --check electron/main.js
     node --check electron/preload.js
+    node --check electron/model-manager.js
+    node --check electron/custom-presets.js
     node --check src/engine.js
     node --check src/preview-worker.js
     node --check src/render-worker.js
+    node --check src/ai-client.js
+    node --check src/ai-segmentation-worker.js
     node --check src/app.js
 
 Run the automated syntax, Electron smoke, control-regression, and resilience
@@ -63,11 +67,12 @@ Minimum manual matrix:
   red-eye, cleanup cap, rotate, flip, crop, zoom, and reset;
 - close/relaunch autosave, recovery selection, quota failure, valid backup,
   corrupt backup, duplicate IDs, duplicate paths, and legacy migration;
-- two-photo compare, analysis, batch sync, HDR average, panorama bounds;
+- two-photo compare, analysis, batch sync, exposure average (SDR), panorama bounds;
 - JPEG, PNG, WebP, TIFF, original copy, resize, quality, watermark history,
   destination cancellation, unwritable destination, and reveal;
 - keyboard-only dialogs and focus behavior;
-- no unexpected runtime network connections.
+- no unexpected runtime network connections; optional model acquisition must
+  occur only after approval and only from the fixed documented HTTPS origin.
 
 Use synthetic or redistributable images. Do not put private client work into
 release logs or screenshots.
@@ -143,12 +148,15 @@ Also inspect **outputs/release/win-unpacked**. Confirm:
 - no source maps, caches, work files, test images, catalogs, or credentials are
   included;
 - production dependencies load from the packaged ASAR/unpacked resources;
+- the model manager, custom-preset validator, selection workers, and required
+  local inference runtime assets exist in the packaged ASAR;
 - Electron and Chromium notices exist;
 - **resources/licenses/LUMA-DARKROOM-MIT.txt** and
   **resources/licenses/THIRD_PARTY_NOTICES.md** exist;
 - **resources/licenses/third_party** contains both GNU texts, MPL 2.0, the AOM
-  license and patent license, Sharp/native inventories, source/relinking
-  guidance, and a matching **SHA256SUMS**;
+  license and patent license, local inference runtime license/notices,
+  Sharp/native inventories, source/relinking guidance, and a matching
+  **SHA256SUMS**;
 - project and native-library notice delivery is complete for the exact artifact;
 - install, repair/upgrade, launch, second launch, and uninstall work in a clean
   environment;

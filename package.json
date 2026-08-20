@@ -1,6 +1,6 @@
 {
   "name": "luma-darkroom",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "A local-first, non-destructive desktop photo workspace",
   "main": "electron/main.js",
   "author": "Luma Darkroom contributors",
@@ -23,7 +23,7 @@
     "build:icons": "node scripts/build-icons.js",
     "build:native-source": "node scripts/build-native-source-bundle.js",
     "build:notices": "node scripts/build-notice-bundle.js",
-    "check:syntax": "node --check electron/main.js && node --check electron/preload.js && node --check src/engine.js && node --check src/render-worker.js && node --check src/preview-worker.js && node --check src/app.js",
+    "check:syntax": "node --check electron/main.js && node --check electron/preload.js && node --check electron/model-manager.js && node --check electron/custom-presets.js && node --check src/engine.js && node --check src/render-worker.js && node --check src/preview-worker.js && node --check src/ai-client.js && node --check src/ai-segmentation-worker.js && node --check src/app.js",
     "test:smoke": "node tests/e2e-smoke.js",
     "test:regression": "node tests/e2e-regression.js",
     "test:resilience": "node tests/e2e-resilience.js",
@@ -33,9 +33,15 @@
     "test:layered-tools": "node tests/e2e-layered-tools.js",
     "test:keyboard-accessibility": "node tests/e2e-keyboard-accessibility.js",
     "test:export-worker": "node tests/e2e-export-worker.js",
+    "test:model-manager": "node --test tests/model-manager.test.js",
+    "test:semantic-masks": "node tests/e2e-semantic-masks.js",
+    "test:ai-segmentation": "node tests/e2e-ai-segmentation.js",
+    "test:point-color": "node tests/e2e-point-color-legacy-contract.js",
+    "test:custom-presets": "node --test tests/custom-presets-validation.test.js && node tests/e2e-custom-presets.js",
+    "test:feature-parity": "node --test tests/feature-parity-contract.test.js",
     "test:packaged": "node tests/packaged-smoke.js",
     "test:packaged-asar": "set LUMA_PACKAGED_ASAR=1&& node tests/packaged-smoke.js",
-    "test": "npm run check:syntax && npm run test:smoke && npm run test:regression && npm run test:resilience && npm run test:interaction && npm run test:brush-workflow && npm run test:legacy-migration && npm run test:layered-tools && npm run test:keyboard-accessibility && npm run test:export-worker",
+    "test": "npm run check:syntax && npm run test:feature-parity && npm run test:model-manager && npm run test:semantic-masks && npm run test:ai-segmentation && npm run test:point-color && npm run test:custom-presets && npm run test:smoke && npm run test:regression && npm run test:resilience && npm run test:interaction && npm run test:brush-workflow && npm run test:legacy-migration && npm run test:layered-tools && npm run test:keyboard-accessibility && npm run test:export-worker",
     "verify:notices": "node scripts/fetch-upstream-notices.js --check",
     "verify:notices:upstream": "node scripts/fetch-upstream-notices.js --check-upstream",
     "verify:release": "node scripts/verify-windows-release.js",
@@ -60,7 +66,9 @@
       "assets/icon.png",
       "LICENSE",
       "THIRD_PARTY_NOTICES.md",
-      "package.json"
+      "package.json",
+      "!node_modules/**/*.map",
+      "!node_modules/**/docs/**"
     ],
     "extraResources": [
       {
@@ -111,6 +119,7 @@
     }
   },
   "dependencies": {
+    "onnxruntime-web": "1.27.0",
     "sharp": "^0.35.3"
   }
 }

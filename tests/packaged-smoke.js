@@ -73,11 +73,14 @@ const { createPhotoFixtures } = require('./helpers/photo-fixtures');
       panels: document.querySelectorAll('.panel').length,
       formats: [...document.querySelectorAll('#exportFormat option')].map((option) => option.textContent.trim()),
       bridge: typeof window.desktop,
+      customPresetBridge: ['exportFile', 'importFile'].map((name) => [name, typeof window.desktop?.customPresets?.[name]]),
+      aiModelBridge: ['list', 'status', 'download', 'cancel', 'get', 'remove', 'onProgress'].map((name) => [name, typeof window.desktop?.aiModels?.[name]]),
       requireType: typeof window.require,
       processType: typeof window.process,
     }));
     console.log(JSON.stringify({ appPath, state, errors }, null, 2));
-    if (errors.length || state.bridge !== 'object' || state.requireType !== 'undefined' || state.processType !== 'undefined') {
+    const missingBridgeMethod = [...state.customPresetBridge, ...state.aiModelBridge].some(([, type]) => type !== 'function');
+    if (errors.length || state.bridge !== 'object' || missingBridgeMethod || state.requireType !== 'undefined' || state.processType !== 'undefined') {
       process.exitCode = 1;
     }
   } finally {

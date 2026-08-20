@@ -38,9 +38,9 @@ when a file-specific reproduction is essential.
 ### A photograph is missing or will not open
 
 Confirm that the original remains at its cataloged path and that the current
-operating-system account can read it. Additional camera-file formats are
-decoded on a best-effort basis and may be unsupported by the bundled
-Sharp/libvips build. The catalog record is retained when decoding fails.
+operating-system account can read it. The packaged Windows build accepts JPEG,
+PNG, WebP, BMP, GIF, TIFF, and AVIF. Camera-RAW and HEIC files are not currently
+supported. The catalog record is retained when decoding fails.
 
 ### Export fails on a very large image
 

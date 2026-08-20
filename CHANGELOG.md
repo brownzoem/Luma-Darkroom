@@ -5,6 +5,58 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+## 2.4.0 - 2026-08-20
+
+### Added
+
+- Optional, user-approved local model packs for guided object/subject/background
+  selection and all-people selection. Downloads use a fixed allowlist, exact
+  size and SHA-256 verification, bounded storage, cancellation, and local
+  worker inference; photographs are not uploaded for selection.
+- Point Color with eight independent hue/saturation/luminance target ranges,
+  sampled visualization, resampling, deletion, persistence, and undo.
+- Decoded-RGB primary calibration controls and manual pet-eye correction with
+  catchlight preservation.
+- Searchable custom presets with 0–200 amount, reusable/photo-specific capture
+  scopes, rename/delete, restart recovery, and bounded validated JSON
+  import/export.
+- Guided Subject and Background masks, all-people masks, Smart Sky selection,
+  and color/luminance range intersections in the existing layered-mask stack.
+- An analyzed neutral-pixel Auto white balance and an explicit capability
+  status document that distinguishes available, limited, and unavailable
+  workflows.
+
+### Changed
+
+- Optimized Point Color with bounded lookup tables and kept preview/export
+  pixels exact while reducing normal worker render time.
+- Reduced semantic-mask preview memory, coalesced stale work, and prevented
+  superseded frames from painting over the latest edit.
+- Made color-range and Point Color sampling independent of active Point Color
+  output, avoiding selection drift after large color shifts.
+- Renamed exposure averaging, dynamic-range looks, manual lens controls, fringe
+  reduction, neutral white balance, and selection choices to describe their
+  actual behavior without implying unimplemented HDR, RAW, lens-profile, or
+  automatic semantic capabilities.
+- Restricted the Windows import picker to codecs confirmed in the packaged
+  decoder and kept TIFF/AVIF conversion as a lossless 8-bit PNG handoff.
+
+### Reliability and security
+
+- Added strict model-file origin, path, symlink, size, stream, hash, temporary-
+  file, atomic-install, recovery, and IPC validation with focused hostile-input
+  tests.
+- Serialized local inference, rejected rapid duplicate launches, and made
+  cancellation release worker/model resources before the next selection.
+- Added dual renderer/main custom-preset validation, prototype-key and
+  non-finite blocking, structural and byte limits, atomic export writes,
+  pre-import last-good recovery, and collision-safe import-as-copy behavior.
+- Increased and globally bounded edit-history memory so large semantic masks
+  retain independent Undo/Redo steps instead of leaving a stale undo timeline.
+- Added real-model offline inference tests, semantic-mask sanitization and
+  parity tests, Point Color legacy and adversarial tests, custom-preset
+  Electron tests, and a product-neutral capability-contract check.
+
 ## 2.3.0 - 2026-08-19
 
 ### Added

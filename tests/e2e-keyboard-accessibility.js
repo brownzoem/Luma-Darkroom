@@ -50,11 +50,10 @@ async function waitForPreview(page) {
   await waitForPreview(page);
 
   await page.click('[data-panel="mask"]');
-  await page.click('#subjectMaskBtn');
+  await page.click('#addBrushMask');
   await page.waitForFunction(() => document.activeElement === canvas);
   const toolAutoFocused = await page.evaluate(() => document.activeElement === canvas);
   await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('Enter');
   await waitForPreview(page);
   const objectState = await page.evaluate(() => ({
     enabled: activeMask()?.enabled,
@@ -65,7 +64,7 @@ async function waitForPreview(page) {
     canvasLabel: canvas.getAttribute('aria-label'),
   }));
 
-  await page.click('#maskAddBtn');
+  await page.keyboard.press('b');
   await page.locator('#canvas').focus();
   await page.keyboard.press('Shift+ArrowDown');
   await page.keyboard.press('Enter');
@@ -181,7 +180,7 @@ async function waitForPreview(page) {
     BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1);
   });
 
-  if (!toolAutoFocused || objectState.type !== 'subject' || !objectState.enabled || Math.abs(objectState.x - 0.51) > 0.02 || objectState.toolMode || !objectState.cursorVisible || !/keyboard cursor/i.test(objectState.canvasLabel)) failures.push('Tool focus, keyboard object selection, or canvas cursor state failed');
+  if (!toolAutoFocused || objectState.type !== 'brush' || !objectState.enabled || objectState.toolMode !== 'mask-add' || !objectState.cursorVisible || !/keyboard cursor/i.test(objectState.canvasLabel)) failures.push('Tool focus, keyboard brush selection, or canvas cursor state failed');
   if (brushState.count !== 1 || brushState.stroke?.mode !== 'add' || brushState.history !== 'Add to mask') failures.push('Keyboard mask brush did not create one undoable stroke');
   if (gradientState.type !== 'linear' || gradientState.distance < 0.04 || gradientState.history !== 'Set mask gradient') failures.push('Two-step keyboard gradient creation failed');
   if (repairs.map(repair => repair.kind).join(',') !== 'heal,clone,red-eye' || repairs.some(repair => !repair.target.every(Number.isFinite)) || !repairs[0].source.every(Number.isFinite) || !repairs[1].source.every(Number.isFinite)) failures.push('Keyboard heal, clone, or red-eye records failed');

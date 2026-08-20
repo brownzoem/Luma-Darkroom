@@ -6,6 +6,7 @@ const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'third_party');
 const upstreamCheck = process.argv.includes('--check-upstream');
 const checkOnly = process.argv.includes('--check') || upstreamCheck;
+const refreshOnnxRuntime = process.argv.includes('--refresh-onnxruntime');
 
 const remoteSources = [
   {
@@ -40,6 +41,17 @@ const remoteSources = [
     url: 'https://raw.githubusercontent.com/lovell/sharp-libvips/v1.3.1/THIRD-PARTY-NOTICES.md',
     minimumBytes: 4_000,
   },
+  {
+    filename: 'ONNXRUNTIME-MIT.txt',
+    url: 'https://raw.githubusercontent.com/microsoft/onnxruntime/v1.27.0/LICENSE',
+    minimumBytes: 1_000,
+  },
+  {
+    filename: 'ONNXRUNTIME-THIRD-PARTY-NOTICES.txt',
+    url: 'https://raw.githubusercontent.com/microsoft/onnxruntime/v1.27.0/ThirdPartyNotices.txt',
+    minimumBytes: 300_000,
+    maximumBytes: 400_000,
+  },
 ];
 
 const localSources = [
@@ -72,7 +84,7 @@ async function fetchSource(source) {
     redirect: 'follow',
     signal: AbortSignal.timeout(30_000),
     headers: {
-      'User-Agent': 'Luma-Darkroom-license-audit/2.2 (+https://lumadarkroom.com)',
+      'User-Agent': 'Luma-Darkroom-license-audit (+https://lumadarkroom.com)',
       Accept: 'text/plain, application/octet-stream;q=0.9, */*;q=0.1',
     },
   });
@@ -81,7 +93,7 @@ async function fetchSource(source) {
   }
 
   const responseBytes = Buffer.from(await response.arrayBuffer());
-  if (responseBytes.length > 256 * 1024) {
+  if (responseBytes.length > (source.maximumBytes || 256 * 1024)) {
     throw new Error(`${source.url}: unexpectedly large response`);
   }
 
@@ -159,10 +171,27 @@ async function verifyCommittedChecksums() {
 
 async function main() {
   if (process.argv.includes('--help')) {
-    console.log('Usage: node scripts/fetch-upstream-notices.js [--check|--check-upstream]');
+    console.log('Usage: node scripts/fetch-upstream-notices.js [--check|--check-upstream|--refresh-onnxruntime]');
     console.log('--check verifies committed hashes and the installed native inventory without network access.');
     console.log('--check-upstream also downloads each canonical source and compares it with the committed copy.');
     console.log('Without an option, refreshes third_party and SHA256SUMS from canonical sources.');
+    return;
+  }
+
+  if (refreshOnnxRuntime) {
+    const selected = remoteSources.filter(source => source.filename.startsWith('ONNXRUNTIME-'));
+    for (const source of selected) {
+      const bytes = await fetchSource(source);
+      await writeAtomic(source.filename, bytes);
+      console.log(`${source.filename}: wrote ${bytes.length} bytes`);
+    }
+    const tracked = [...new Set([...remoteSources, ...localSources].map(source => source.filename))].sort();
+    const sums = Buffer.from((await Promise.all(tracked.map(async filename => {
+      const bytes = await fs.readFile(path.join(output, filename));
+      return `${sha256(bytes)}  ${filename}\n`;
+    }))).join(''));
+    await writeAtomic('SHA256SUMS', sums);
+    console.log('SHA256SUMS: updated');
     return;
   }
 

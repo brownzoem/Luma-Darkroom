@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 const sharp = require('sharp');
+const { ModelManager } = require('./model-manager');
+const { MAX_CUSTOM_PRESET_FILE_BYTES, validateCustomPresetEnvelope, serializeCustomPresetEnvelope } = require('./custom-presets');
 const INDEX_PATH = path.join(__dirname, '..', 'src', 'index.html');
 const APP_PAGE_URL = pathToFileURL(INDEX_PATH).toString();
 
@@ -26,7 +28,11 @@ process.on('unhandledRejection', (reason) => console.error('Unhandled main-proce
 protocol.registerSchemesAsPrivileged([{ scheme: 'local-image', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }]);
 const imageUrl = filePath => `local-image://load?path=${encodeURIComponent(filePath)}`;
 const directImageTypes = { '.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.bmp':'image/bmp' };
-const convertedImageTypes = new Set(['.tif','.tiff','.avif','.heif','.heic','.dng','.cr2','.cr3','.nef','.nrw','.arw','.srf','.sr2','.raf','.rw2','.orf','.pef','.x3f']);
+// Keep this allowlist aligned with the codecs actually present in the packaged
+// Sharp/libvips build. Camera RAW and HEIC files are intentionally excluded:
+// advertising an extension that decodes only on some developer machines makes
+// import look successful before the preview fails.
+const convertedImageTypes = new Set(['.tif','.tiff','.avif']);
 const decodedCache = new Map();
 let decodedCacheBytes = 0;
 const thumbnailCache = new Map();
@@ -87,6 +93,26 @@ const atomicCopy = async (source, destination) => {
     await fs.promises.rename(temporary, destination);
   } finally {
     await fs.promises.unlink(temporary).catch(() => {});
+  }
+};
+const readBoundedRegularFile = async (filePath, maximumBytes, minimumBytes = 0, label = 'File') => {
+  const noFollow = fs.constants.O_NOFOLLOW || 0;
+  const handle = await fs.promises.open(filePath, fs.constants.O_RDONLY | noFollow);
+  try {
+    const before = await handle.stat();
+    if (!before.isFile() || before.size < minimumBytes || before.size > maximumBytes) throw new RangeError(`${label} is empty or too large`);
+    const bytes = Buffer.allocUnsafe(before.size);
+    let offset = 0;
+    while (offset < bytes.byteLength) {
+      const result = await handle.read(bytes, offset, bytes.byteLength - offset, offset);
+      if (!result.bytesRead) break;
+      offset += result.bytesRead;
+    }
+    const after = await handle.stat();
+    if (offset !== bytes.byteLength || !after.isFile() || after.size !== before.size) throw new Error(`${label} changed while it was being read`);
+    return bytes;
+  } finally {
+    await handle.close();
   }
 };
 let sandboxFallbackUsed = false;
@@ -155,9 +181,40 @@ app.whenReady().then(() => {
   const assertTrustedIpc = event => {
     if (event.senderFrame?.url !== APP_PAGE_URL) throw new Error('Untrusted IPC sender');
   };
+  const modelManager = new ModelManager({ baseDir: path.join(app.getPath('userData'), 'ai-models') });
+  modelManager.on('progress', payload => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('ai-model-progress', payload);
+    }
+  });
+  app.once('before-quit', () => modelManager.cancelAll());
+  ipcMain.handle('ai-model-list', event => {
+    assertTrustedIpc(event);
+    return modelManager.list();
+  });
+  ipcMain.handle('ai-model-status', (event, id) => {
+    assertTrustedIpc(event);
+    return modelManager.status(id);
+  });
+  ipcMain.handle('ai-model-download', (event, id) => {
+    assertTrustedIpc(event);
+    return modelManager.download(id);
+  });
+  ipcMain.handle('ai-model-cancel', (event, id) => {
+    assertTrustedIpc(event);
+    return modelManager.cancel(id);
+  });
+  ipcMain.handle('ai-model-get', (event, id) => {
+    assertTrustedIpc(event);
+    return modelManager.get(id);
+  });
+  ipcMain.handle('ai-model-remove', (event, id) => {
+    assertTrustedIpc(event);
+    return modelManager.remove(id);
+  });
   ipcMain.handle('pick-images', async event => {
     assertTrustedIpc(event);
-    const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'Photos and camera RAW', extensions: ['jpg','jpeg','png','webp','bmp','gif','tif','tiff','avif','heif','heic','dng','cr2','cr3','nef','nrw','arw','srf','sr2','raf','rw2','orf','pef','x3f'] }] });
+    const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'Supported photos', extensions: ['jpg','jpeg','png','webp','bmp','gif','tif','tiff','avif'] }] });
     return result.canceled ? [] : result.filePaths.map(filePath => ({ filePath, name: path.basename(filePath), url: imageUrl(filePath) }));
   });
   ipcMain.handle('export-image', async (event, payload = {}) => {
@@ -206,9 +263,30 @@ app.whenReady().then(() => {
     assertTrustedIpc(event);
     const result = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Luma Catalog', extensions: ['json'] }] });
     if (result.canceled) return null;
-    const stat = await fs.promises.stat(result.filePaths[0]);
-    if (!stat.isFile() || stat.size > 50_000_000) throw new Error('Catalog file is too large');
-    return fs.promises.readFile(result.filePaths[0], 'utf8');
+    return (await readBoundedRegularFile(result.filePaths[0], 50_000_000, 1, 'Catalog file')).toString('utf8');
+  });
+  ipcMain.handle('custom-presets-export', async (event, payload) => {
+    assertTrustedIpc(event);
+    const text = serializeCustomPresetEnvelope(payload);
+    const result = await dialog.showSaveDialog({
+      title: 'Export custom presets',
+      defaultPath: 'Luma-Custom-Presets.json',
+      filters: [{ name: 'Luma Custom Presets', extensions: ['json'] }]
+    });
+    if (result.canceled) return null;
+    await atomicWrite(result.filePath, text, 'utf8');
+    return result.filePath;
+  });
+  ipcMain.handle('custom-presets-import', async event => {
+    assertTrustedIpc(event);
+    const result = await dialog.showOpenDialog({
+      title: 'Import custom presets',
+      properties: ['openFile'],
+      filters: [{ name: 'Luma Custom Presets', extensions: ['json'] }]
+    });
+    if (result.canceled) return null;
+    const text = (await readBoundedRegularFile(result.filePaths[0], MAX_CUSTOM_PRESET_FILE_BYTES, 1, 'Custom preset file')).toString('utf8');
+    return validateCustomPresetEnvelope(text);
   });
   ipcMain.handle('open-help-guide', async event => {
     assertTrustedIpc(event);

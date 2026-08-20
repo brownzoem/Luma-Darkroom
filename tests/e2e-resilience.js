@@ -206,8 +206,7 @@ async function livePage(app) {
     return { trackingCleared: activePreset === null && presetBase === null, beforeAmountMove, afterAmountMove: current.edits.light.exposure };
   });
 
-  // Creating and placing an object mask are separate undoable edits. The new
-  // layer must remain inactive until the user chooses a source point.
+  // Creating and placing a gradient are separate undoable edits.
   await page.evaluate(() => {
     catalogDirty = false;
     current.edits.masks = { activeId: '', layers: [] };
@@ -216,10 +215,14 @@ async function livePage(app) {
     toolMode = '';
     refreshControls();
   });
-  await page.click('#focusModeBtn');
+  await page.click('[data-panel="mask"]');
+  await page.click('#addLinearMask');
   const focusArmed = await page.evaluate(() => ({ enabled: current.edits.masks.layers[0]?.enabled, dirty: catalogDirty, undoEntries: undoByPhoto.get(current.id)?.length || 0, toolMode }));
   const focusCanvas = await page.locator('#canvas').boundingBox();
-  await page.mouse.click(focusCanvas.x + focusCanvas.width * .5, focusCanvas.y + focusCanvas.height * .5);
+  await page.mouse.move(focusCanvas.x + focusCanvas.width * .3, focusCanvas.y + focusCanvas.height * .4);
+  await page.mouse.down();
+  await page.mouse.move(focusCanvas.x + focusCanvas.width * .7, focusCanvas.y + focusCanvas.height * .6, { steps: 4 });
+  await page.mouse.up();
   results.focusActivation = await page.evaluate(armed => ({ armed, enabled: current.edits.masks.layers[0]?.enabled, dirty: catalogDirty, undoEntries: undoByPhoto.get(current.id)?.length || 0, toolMode }), focusArmed);
 
   // Native constraints must reject invalid export values before opening a save dialog.
@@ -447,7 +450,7 @@ async function livePage(app) {
   if (!results.beforeHold.down.compare || results.beforeHold.down.pressed !== 'true' || results.beforeHold.up.compare || results.beforeHold.up.pressed !== 'false') failures.push('Before press/hold state failed');
   if (results.keyboardUndo.edited === results.keyboardUndo.before || results.keyboardUndo.undone !== results.keyboardUndo.before || !results.keyboardUndo.undoDisabled) failures.push('Keyboard range undo failed');
   if (!results.presetManualEdit.trackingCleared || results.presetManualEdit.beforeAmountMove !== results.presetManualEdit.afterAmountMove) failures.push('Preset amount overwrote a later manual edit');
-  if (results.focusActivation.armed.enabled || !results.focusActivation.armed.dirty || results.focusActivation.armed.undoEntries !== 1 || results.focusActivation.armed.toolMode !== 'focus' || !results.focusActivation.enabled || !results.focusActivation.dirty || results.focusActivation.undoEntries !== 2 || results.focusActivation.toolMode) failures.push('Object-mask creation/placement was not persisted as two undoable edits');
+  if (!results.focusActivation.armed.enabled || !results.focusActivation.armed.dirty || results.focusActivation.armed.undoEntries !== 1 || results.focusActivation.armed.toolMode !== 'mask-linear' || !results.focusActivation.enabled || !results.focusActivation.dirty || results.focusActivation.undoEntries !== 2 || results.focusActivation.toolMode !== 'mask-linear') failures.push('Gradient-mask creation/placement was not persisted as two undoable edits');
   if (!results.exportValidation.open || !results.exportValidation.invalid) failures.push('Export validation did not contain invalid input');
   if (!results.originalExport.target.includes('qa-0') || results.originalExport.disabled.some(value => !value) || !results.originalExport.noteVisible || !results.originalExport.note.includes('unchanged')) failures.push('Original export left irrelevant controls enabled');
   if (!results.modalShortcuts.exportOpen || results.modalShortcuts.helpOpen || results.modalShortcuts.flag !== 'none') failures.push('Modal shortcut containment failed');

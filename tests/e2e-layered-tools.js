@@ -278,6 +278,19 @@ async function previewExportParity(page) {
     const eyeEdits = E.defaultEdits();
     eyeEdits.cleanup = [{ kind: 'red-eye', space: 'frame', x: 0.5, y: 0.5, size: 10, feather: 65, opacity: 100, pupilSize: 100, darken: 100 }];
     const correctedEye = E.render(eyeSource, eyeEdits);
+    const petEyeSource = surface(240, 160, 'rgb(80 75 65)');
+    const petEyeContext = petEyeSource.getContext('2d');
+    petEyeContext.fillStyle = 'rgb(35 235 82)';
+    petEyeContext.beginPath();
+    petEyeContext.arc(120, 80, 17, 0, Math.PI * 2);
+    petEyeContext.fill();
+    petEyeContext.fillStyle = 'white';
+    petEyeContext.beginPath();
+    petEyeContext.arc(113, 73, 3, 0, Math.PI * 2);
+    petEyeContext.fill();
+    const petEyeEdits = E.defaultEdits();
+    petEyeEdits.cleanup = [{ kind: 'pet-eye', space: 'frame', x: 0.5, y: 0.5, size: 10, feather: 65, opacity: 100, pupilSize: 100, darken: 100 }];
+    const correctedPetEye = E.render(petEyeSource, petEyeEdits);
     const retouchState = {
       cloneSource: pixel(cloneSource, 48, 40),
       cloneTarget: pixel(cloned, 192, 40),
@@ -286,6 +299,9 @@ async function previewExportParity(page) {
       eyeBefore: pixel(eyeSource, 120, 80),
       eyeAfter: pixel(correctedEye, 120, 80),
       catchlightAfter: pixel(correctedEye, 113, 73),
+      petEyeBefore: pixel(petEyeSource, 120, 80),
+      petEyeAfter: pixel(correctedPetEye, 120, 80),
+      petCatchlightAfter: pixel(correctedPetEye, 113, 73),
     };
 
     const legacyRepairSource = surface(240, 160, 'rgb(45 85 115)');
@@ -527,6 +543,8 @@ async function previewExportParity(page) {
   await clickCanvas(0.72, 0.7);
   await page.click('#redEyeMaskBtn');
   await clickCanvas(0.51, 0.48);
+  await page.click('#petEyeMaskBtn');
+  await clickCanvas(0.58, 0.48);
   await waitForPreview(page);
   const repairs = await page.evaluate(() => E.clone(current.edits.cleanup));
   const healSampleAnchor = await page.evaluate(() => {
@@ -685,14 +703,14 @@ async function previewExportParity(page) {
 
   const failures = [];
   const legacy = engine.legacyState;
-  if (legacy.version !== 5 || legacy.layers !== 1 || legacy.activeId !== 'legacy-mask' || legacy.type !== 'subject' || legacy.space !== 'frame' || legacy.exposure !== 0.55 || legacy.strokes !== 1 || legacy.protectTones !== false || legacy.parityMaxDelta !== 0 || legacy.inertLayers !== 0) failures.push('Version 2 local-mask migration lost state or render parity');
+  if (legacy.version !== 7 || legacy.layers !== 1 || legacy.activeId !== 'legacy-mask' || legacy.type !== 'subject' || legacy.space !== 'frame' || legacy.exposure !== 0.55 || legacy.strokes !== 1 || legacy.protectTones !== false || legacy.parityMaxDelta !== 0 || legacy.inertLayers !== 0) failures.push('Version 2 local-mask migration lost state or render parity');
   const sanitize = engine.sanitizedState;
   if (sanitize.layers !== 8 || sanitize.totalStrokes !== 1024 || sanitize.maximumLayerStrokes !== 256 || sanitize.uniqueIds !== 8 || !sanitize.safeIds || !sanitize.namesBounded || !sanitize.typesSafe || !sanitize.activeValid || sanitize.boundedLayer.x !== 0 || sanitize.boundedLayer.y !== 1 || sanitize.boundedLayer.opacity !== 100 || sanitize.boundedLayer.brushSize !== 100 || sanitize.cleanup !== 200 || sanitize.boundedCleanup.x !== 0 || sanitize.boundedCleanup.y !== 1 || sanitize.boundedCleanup.radiusPx !== 100000 || sanitize.boundedCleanup.size !== 25 || sanitize.boundedCleanup.opacity !== 1 || sanitize.boundedCleanup.kind !== 'heal') failures.push('Mask or repair sanitization limits failed');
   const gradients = engine.gradients;
   if (!(gradients.linearLeft > gradients.linearRight + 35 && gradients.halfLinearLeft > gradients.baseValue + 10 && gradients.halfLinearLeft < gradients.linearLeft - 10 && gradients.hiddenDelta === 0 && gradients.radialCenter > gradients.radialCorner + 45)) failures.push('Linear/radial mask rendering, opacity, or visibility failed');
   if (!(engine.dodgeBurnState.dodge > engine.dodgeBurnState.base + 5 && engine.dodgeBurnState.burn < engine.dodgeBurnState.base - 5)) failures.push('Dodge and burn masks did not lighten and darken independently');
   const retouch = engine.retouchState;
-  if (!(retouch.cloneTarget[2] > retouch.cloneTarget[0] * 2 && retouch.cloneTarget[2] > 170 && retouch.healAfter > retouch.healBefore + 40 && retouch.eyeAfter[0] < retouch.eyeBefore[0] - 40 && retouch.catchlightAfter[0] > 225 && retouch.catchlightAfter[1] > 225 && retouch.catchlightAfter[2] > 225)) failures.push('Clone, heal, or red-eye pixel behavior failed');
+  if (!(retouch.cloneTarget[2] > retouch.cloneTarget[0] * 2 && retouch.cloneTarget[2] > 170 && retouch.healAfter > retouch.healBefore + 40 && retouch.eyeAfter[0] < retouch.eyeBefore[0] - 40 && retouch.catchlightAfter[0] > 225 && retouch.catchlightAfter[1] > 225 && retouch.catchlightAfter[2] > 225 && retouch.petEyeAfter[1] < retouch.petEyeBefore[1] - 80 && Math.max(...retouch.petEyeAfter.slice(0,3))-Math.min(...retouch.petEyeAfter.slice(0,3)) < 8 && retouch.petCatchlightAfter[0] > 225 && retouch.petCatchlightAfter[1] > 225 && retouch.petCatchlightAfter[2] > 225)) failures.push('Clone, heal, red-eye, or pet-eye pixel behavior failed');
   if (engine.legacyRepairState.radiusPx !== null || engine.legacyRepairState.sourceX !== null || engine.legacyRepairState.after < engine.legacyRepairState.before + 40) failures.push('Legacy cleanup fallback compatibility failed');
   const anchoredFootprints = engine.radiusAnchoring;
   const expectedFootprintCases = (5 + 4 * 2 * 2) * 3;
@@ -704,7 +722,7 @@ async function previewExportParity(page) {
   if (!dodgeArmed || !burnArmed || stackBefore.dodge?.subjectExposure !== 0.35 || stackBefore.burn?.subjectExposure !== -0.35 || stackBefore.dodge?.toneRange !== 'midtones' || stackBefore.burn?.toneRange !== 'midtones' || !stackBefore.dodge?.protectTones || !stackBefore.burn?.protectTones || !stackBefore.dodge?.strokes.length || !stackBefore.burn?.strokes.length) failures.push('Consecutive Dodge/Burn creation or painting failed');
   if (stackBefore.names.join(',') !== 'Burn,Dodge,Radial gradient 1,Linear gradient 1' || stackBefore.types.join(',') !== 'brush,brush,radial,linear' || stackBefore.countLabel !== '4 / 8') failures.push('Mask stack create order or labels failed');
   if (beforeOrder.join(',') === afterOrder.join(',') || orderAfterUndo.join(',') !== beforeOrder.join(',') || orderAfterRedo.join(',') !== afterOrder.join(',') || stackAfter.active !== 'Burn shadows' || stackAfter.opacity !== 42 || stackAfter.enabled !== false) failures.push('Mask reorder, opacity, visibility, rename, undo, or redo failed');
-  if (repairs.map(repair => repair.kind).join(',') !== 'heal,clone,red-eye' || repairs.some(repair => repair.space !== 'source' || !Number.isFinite(repair.radiusPx) || repair.radiusPx <= 0) || repairs[0].sourceX == null || repairs[0].sourceY == null || repairs[1].sourceX == null || repairs[1].sourceY == null || healSampleAnchor.error > 1e-9) failures.push('Heal, clone, or red-eye UI records are incomplete or not source anchored');
+  if (repairs.map(repair => repair.kind).join(',') !== 'heal,clone,red-eye,pet-eye' || repairs.some(repair => repair.space !== 'source' || !Number.isFinite(repair.radiusPx) || repair.radiusPx <= 0) || repairs[0].sourceX == null || repairs[0].sourceY == null || repairs[1].sourceX == null || repairs[1].sourceY == null || healSampleAnchor.error > 1e-9) failures.push('Heal, clone, red-eye, or pet-eye UI records are incomplete or not source anchored');
   if (!retouchCursor.visible || Math.abs(repairs[0].radiusPx - retouchCursor.expectedRadiusPx) > 0.5 || Math.abs(retouchCursor.canvasSize[0] / retouchCursor.canvasSize[1] - 1) < 0.2) failures.push('Stored repair radius does not match the visible retouch cursor on a non-square photo');
   if (remapMatrix.cases.length !== 32 || remapMatrix.maximumError > 1e-9 || remapMatrix.maximumRadiusError > 1e-9) failures.push('Mask, gradient, stroke, or repair remapping diverged from renderer orientation across rotate/flip combinations');
   if (rotation.rotation90 !== 90 || rotation.maximumError > 1e-9 || rotation.maximumRadiusError > 1e-9 || !undoRestoredRotation || !redoRestoredRotation) failures.push('Mask/repair rotation anchoring or history failed');

@@ -66,12 +66,12 @@ The application layer:
 - migrates, validates, autosaves, recovers, backs up, and restores the catalog;
 - manages presets, metadata, filtering, culling shortcuts, selection, compare,
   merge, watermark history, and bounded undo/redo;
-- loads the active image and four bounded neighboring prefetch images;
+- loads the active image and at most one bounded neighboring prefetch image;
 - creates a persistent, coalescing preview worker with stale-result rejection,
   watchdog recovery, and a bounded main-thread fallback;
 - creates, monitors, cancels, and releases bounded background export workers;
 - contains user-facing recovery for async, decode, render, storage, and export
-  failures.
+  failures, including a bounded renderer reload/restart path.
 
 ### src/engine.js
 
@@ -105,7 +105,8 @@ its bitmap and worker resources on success, failure, cancellation, or timeout.
 
 1. Import stores a native path and metadata; it does not copy or modify the
    source.
-2. The renderer requests a URL such as **local-image://load?path=...**.
+2. The renderer requests a URL such as **local-image://load?path=...**. Library
+   and filmstrip requests add a bounded **thumb** size and load lazily.
 3. The main-process handler validates that the path is absolute, exists, is a
    regular supported file, and is below the relevant input-size limit.
 4. JPEG, PNG, WebP, GIF, and BMP are returned directly.
@@ -116,7 +117,9 @@ its bitmap and worker resources on success, failure, cancellation, or timeout.
    processing, subject to a 350 MB decoded-buffer limit. This avoids an extra
    lossy generation but is not a scene-referred RAW or metadata-preserving
    development path.
-7. The renderer decodes the active image into an Image object. A selection token
+7. Thumbnail requests use a four-job Sharp queue plus a 256-entry/64 MB cache;
+   duplicate in-flight requests share one job.
+8. The renderer decodes the active image into an Image object. A selection token
    discards stale callbacks; errors and a 30-second timeout return the user to
    the library without dropping catalog metadata.
 
@@ -139,8 +142,8 @@ Edits are nested, versioned, non-destructive instructions:
 - optics toggles and manual corrections;
 - rotation, flip, straighten, perspective-like transforms, aspect, scale,
   offsets, and crop zoom/position;
-- up to eight ordered local-mask layers with bounded brush strokes, plus a
-  bounded source-anchored retouch list.
+- up to eight ordered local-mask layers with bounded compact brush paths and
+  points, plus a bounded source-anchored retouch list.
 
 Interactive preview requests use a capped draft long edge and then settle at a
 zoom-, viewport-, and display-density-aware edge between 1050 and 3200 pixels.
@@ -181,10 +184,12 @@ The renderer uses these local-storage keys:
 | luma-watermark-history | Up to three recent non-empty watermark strings |
 
 The catalog envelope has a version, timestamp, monotonic generation, checksum,
-and photo array. Startup parses candidates independently and chooses the newest
-valid generation, preferring the primary on a tie. Individual malformed records
-are skipped. A catalog that is wholly unreadable is preserved rather than
-replaced by an empty save.
+and photo array. Default-valued edit fields are omitted from stored records and
+restored by schema migration, which keeps lightly edited large libraries much
+smaller without changing their in-memory meaning. Startup parses candidates
+independently and chooses the newest valid generation, preferring the primary
+on a tie. Individual malformed records are skipped. A catalog that is wholly
+unreadable is preserved rather than replaced by an empty save.
 
 Autosave occurs after a short debounce, every five seconds while dirty, when
 the document becomes hidden, and during pagehide/beforeunload. Local-storage
@@ -196,15 +201,18 @@ Manual JSON backup is the durable interchange and recovery mechanism.
 
 | Resource | Bound |
 | --- | ---: |
-| Renderer catalog input | 24 million string characters, 50,000 records |
+| Renderer autosave payload | 8 million string characters, 50,000 records |
+| Renderer catalog backup input | 50 million string characters, 50,000 records |
 | Main-process catalog backup input | 50 MB |
 | Undo history | 50 entries per photo, 24 recently used photos |
 | One history entry | 750 KB serialized before + after |
 | Cleanup spots | 200 per photo |
 | Mask layers | Eight per photo |
 | Mask strokes | 256 per layer and 1,024 total per photo |
+| Brush path points | 4,096 per path and 8,192 per layer/photo |
 | Curve points | 64 per channel |
-| Prefetch images | Four, two on either side |
+| Full-resolution prefetch images | One adjacent photograph |
+| Thumbnail work/cache | Four jobs; 256 entries and 64 MB |
 | Selected merge input | 12 photographs |
 | Converted main-process cache | Three buffers and 256 MB |
 | Direct source-file size | 256 MB |

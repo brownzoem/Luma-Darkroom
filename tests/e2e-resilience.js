@@ -382,18 +382,35 @@ async function livePage(app) {
   // Exercise catalog-scale DOM work to expose unbounded thumbnail rendering.
   results.catalogScale = await page.evaluate(filePath => {
     photos = Array.from({ length: 5000 }, (_item, index) => E.migratePhoto({ id: `bulk-${index}`, filePath, name: `bulk-${index}.jpg`, importedAt: index }));
+    photos[1].edits.light.exposure = 0.77;
+    photos[2].edits.masks = { activeId: 'scale-mask', layers: [E.defaultMaskLayer({ id: 'scale-mask', name: 'Scale mask', type: 'brush', strokes: [{ kind: 'path', id: 'scale-path', mode: 'add', size: 14, feather: 55, flow: 25, spacing: .1, points: [[.2, .3, 1, 14], [.4, .5, .6, 14]] }] })] };
+    photos[3].edits.profile = 'Luma Vivid'; photos[3].edits.profileAmount = 55; photos[3].edits.bw = true;
     current = photos[2500];
     const started = performance.now();
     renderFilmstrip();
     const filmstripMilliseconds = Math.round(performance.now() - started);
     const libraryStarted = performance.now();
     setView('library');
+    const serializeStarted = performance.now();
+    const payload = makeCatalogPayload();
+    const parsed = JSON.parse(payload);
+    let localSave = true;
+    try { localStorage.setItem('luma-scale-probe', payload); localStorage.removeItem('luma-scale-probe'); } catch { localSave = false; }
+    const roundTripExposure = E.migratePhoto(parsed.photos[1]).edits.light.exposure;
+    const roundTripPathPoints = E.migratePhoto(parsed.photos[2]).edits.masks.layers[0]?.strokes[0]?.points?.length || 0;
+    const sparseProfile = E.migratePhoto(parsed.photos[3]).edits;
     return {
       filmstripMilliseconds,
       filmstripNodes: filmstrip.querySelectorAll('.thumb').length,
       libraryMilliseconds: Math.round(performance.now() - libraryStarted),
       libraryNodes: grid.querySelectorAll('.card').length,
-      moreVisible: !libraryMore.classList.contains('hidden')
+      moreVisible: !libraryMore.classList.contains('hidden'),
+      payloadBytes: payload.length,
+      serializeMilliseconds: Math.round(performance.now() - serializeStarted),
+      localSave,
+      roundTripExposure,
+      roundTripPathPoints,
+      sparseProfile: { profile: sparseProfile.profile, profileAmount: sparseProfile.profileAmount, bw: sparseProfile.bw }
     };
   }, sample);
   await page.click('#loadMoreBtn');
@@ -429,7 +446,7 @@ async function livePage(app) {
       : state.mainDisplay === 'flex' && state.workspaceBeforeSidebar;
     return !expectedLayout || state.horizontalOverflow > 2 || state.dialogMaxHeight === 'none' || state.clippedFocusable.length;
   })) failures.push('High-zoom responsive reflow failed');
-  if (results.catalogScale.filmstripNodes > 201 || results.catalogScale.libraryNodes > 400 || !results.catalogScale.moreVisible || results.catalogScale.afterLoadMore !== 800) failures.push('Catalog rendering bounds failed');
+  if (results.catalogScale.filmstripNodes > 201 || results.catalogScale.libraryNodes > 400 || !results.catalogScale.moreVisible || results.catalogScale.afterLoadMore !== 800 || results.catalogScale.payloadBytes >= 8_000_000 || !results.catalogScale.localSave || results.catalogScale.roundTripExposure !== .77 || results.catalogScale.roundTripPathPoints !== 2 || results.catalogScale.sparseProfile.profile !== 'Luma Vivid' || results.catalogScale.sparseProfile.profileAmount !== 55 || !results.catalogScale.sparseProfile.bw) failures.push('Catalog rendering, persistence bounds, or sparse round trip failed');
   if (errors.length) failures.push('Renderer emitted unexpected errors');
   results.failures = failures;
   results.errors = errors;

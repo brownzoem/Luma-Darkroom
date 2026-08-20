@@ -21,7 +21,8 @@ The suite includes:
   and renderer-security invariants;
 - a resilience pass covering quota failure, recovery records, missing files,
   rapid navigation, tiny images, corrupt values, unsupported drops, undo, and
-  a 5,000-record catalog;
+  a 5,000-record catalog including an actual sparse save and migration round
+  trip;
 - an interaction-quality pass covering preset replacement, converted-source
   fidelity, zoom-aware preview resolution, mask refinement, and UI heartbeat
   latency;
@@ -36,6 +37,9 @@ The suite includes:
   focus feedback, and content reachability at 400% application zoom;
 - an export-worker pass covering encoded-image validity, selected-photo
   targeting, event-loop responsiveness, cancellation, and worker cleanup.
+- a brush-workflow pass covering compact paths, coarse/coalesced and
+  pressure-varying strokes, stable draft layout, crop-consistent sizing,
+  shortcut guards, overlay lifecycle, and zoom/pan geometry.
 
 Tests create synthetic redistributable image fixtures in the operating-system
 temporary directory. Test profiles and screenshots must not be committed.

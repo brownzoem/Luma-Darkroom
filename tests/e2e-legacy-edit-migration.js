@@ -135,6 +135,31 @@ let app;
     const migratedCleanup = E.migratedEdits({ version: 2, cleanup: [legacySpot] });
     const actualCleanup = E.render(cleanupSource, migratedCleanup, { maxEdge: null });
 
+    // Frozen v4 hard-brush sampling oracle. Version 4 sampled the bounded mask
+    // map with nearest-neighbor lookup; upgrading must not soften saved edges.
+    const legacyBrushSource = surface(800, 500, 'rgb(96 96 96)');
+    const legacyBrushEdits = {
+      version: 4,
+      masks: { activeId: 'legacy-brush', layers: [{
+        id: 'legacy-brush', name: 'Legacy brush', enabled: true, type: 'brush',
+        space: 'source', subjectExposure: 1, show: false,
+        strokes: [{ x: .5, y: .5, size: 20, feather: 0, flow: 100, mode: 'add' }],
+      }] },
+    };
+    const migratedBrush = E.migratedEdits(legacyBrushEdits);
+    const actualBrush = E.render(legacyBrushSource, migratedBrush, { maxEdge: null });
+    const expectedBrush = surface(800, 500, 'rgb(96 96 96)');
+    const expectedBrushContext = expectedBrush.getContext('2d', { willReadFrequently: true });
+    const expectedBrushImage = expectedBrushContext.getImageData(0, 0, expectedBrush.width, expectedBrush.height);
+    const maskWidth = 512, maskHeight = 320, legacyBrushMask = surface(maskWidth, maskHeight, '#0000'), legacyBrushMaskContext = legacyBrushMask.getContext('2d', { willReadFrequently: true });
+    legacyBrushMaskContext.fillStyle = '#fff'; legacyBrushMaskContext.beginPath(); legacyBrushMaskContext.arc(maskWidth / 2, maskHeight / 2, 20 / 100 * maskWidth / 2, 0, Math.PI * 2); legacyBrushMaskContext.fill();
+    const legacyBrushAlpha = legacyBrushMaskContext.getImageData(0, 0, maskWidth, maskHeight).data;
+    for (let y = 0; y < expectedBrush.height; y++) for (let x = 0; x < expectedBrush.width; x++) {
+      const maskX = Math.max(0, Math.min(maskWidth - 1, Math.floor((x + .5) * maskWidth / expectedBrush.width))), maskY = Math.max(0, Math.min(maskHeight - 1, Math.floor((y + .5) * maskHeight / expectedBrush.height))), weight = legacyBrushAlpha[(maskY * maskWidth + maskX) * 4 + 3] / 255, value = 96 * Math.pow(2, weight), offset = (y * expectedBrush.width + x) * 4;
+      expectedBrushImage.data[offset] = expectedBrushImage.data[offset + 1] = expectedBrushImage.data[offset + 2] = value;
+    }
+    expectedBrushContext.putImageData(expectedBrushImage, 0, 0);
+
     // Track every temporary canvas allocation while rendering a hostile but
     // schema-valid radius. The main 300x300 transform should remain the peak;
     // the repair patch must be clipped to the 30x30 output intersection.
@@ -193,6 +218,10 @@ let app;
         modernKindless,
         difference: difference(expectedCleanup, actualCleanup),
       },
+      brush: {
+        legacySampling: migratedBrush.masks.layers[0].legacySampling,
+        difference: difference(expectedBrush, actualBrush),
+      },
       hostile: {
         output: [hostileRender.width, hostileRender.height],
         peakPixels,
@@ -205,6 +234,7 @@ let app;
   if (result.mask.difference.maximum > 1 || result.mask.difference.mean > 0.1) failures.push('v2 Object mask pixels diverged from the frozen renderer oracle');
   if (result.cleanup.migration.kind !== 'legacy-v2' || result.cleanup.migration.space !== 'frame' || result.cleanup.migration.feather !== 0 || result.cleanup.migration.opacity !== 88) failures.push('v2 cleanup spot did not retain its legacy renderer semantics');
   if (result.cleanup.difference.maximum !== 0 || result.cleanup.difference.changed !== 0) failures.push('v2 cleanup pixels diverged from the frozen renderer oracle');
+  if (!result.brush.legacySampling || result.brush.difference.maximum !== 0 || result.brush.difference.changed !== 0) failures.push('v4 hard-brush pixels diverged from the frozen nearest-sampling oracle');
   if (result.cleanup.modernKindless.kind !== 'heal') failures.push('v4 kindless cleanup fallback was incorrectly treated as a legacy repair');
   if (result.hostile.output.join(',') !== '30,30' || result.hostile.peakPixels > 90000) failures.push('Hostile repair radius caused an out-of-bounds temporary canvas allocation');
   if (errors.length) failures.push('Renderer emitted unexpected errors');

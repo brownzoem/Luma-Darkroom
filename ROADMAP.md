@@ -20,7 +20,8 @@ review, maintenance constraints, or contributor feedback.
 
 - Move histogram analysis away from the UI thread and continue reducing
   redundant preview work.
-- Add bounded thumbnail and preview caches with explicit rebuild controls.
+- Add an explicit thumbnail-cache rebuild control and evaluate a bounded
+  persistent preview cache beyond the current in-memory thumbnails.
 - Evaluate a transactional catalog backend and sidecar export while preserving
   import compatibility with the current JSON catalog.
 - Add interactive crop handles and a normalized geometry model shared by

@@ -29,6 +29,10 @@ const directImageTypes = { '.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'imag
 const convertedImageTypes = new Set(['.tif','.tiff','.avif','.heif','.heic','.dng','.cr2','.cr3','.nef','.nrw','.arw','.srf','.sr2','.raf','.rw2','.orf','.pef','.x3f']);
 const decodedCache = new Map();
 let decodedCacheBytes = 0;
+const thumbnailCache = new Map();
+const pendingThumbnails = new Map();
+let thumbnailCacheBytes = 0, thumbnailJobs = 0;
+const thumbnailWaiters = [];
 const safeName = (value, fallback) => path.basename(String(value || fallback)).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 180) || fallback;
 const cacheDecoded = (key, buffer) => {
   if (buffer.byteLength > 128_000_000) return;
@@ -40,6 +44,24 @@ const cacheDecoded = (key, buffer) => {
     decodedCache.delete(oldestKey);
     decodedCacheBytes -= oldest?.byteLength || 0;
   }
+};
+const cacheThumbnail = (key, buffer) => {
+  if (thumbnailCache.has(key)) thumbnailCacheBytes -= thumbnailCache.get(key).byteLength;
+  thumbnailCache.delete(key);
+  thumbnailCache.set(key, buffer);
+  thumbnailCacheBytes += buffer.byteLength;
+  while (thumbnailCache.size > 256 || thumbnailCacheBytes > 64_000_000) {
+    const oldestKey = thumbnailCache.keys().next().value;
+    const oldest = thumbnailCache.get(oldestKey);
+    thumbnailCache.delete(oldestKey);
+    thumbnailCacheBytes -= oldest?.byteLength || 0;
+  }
+};
+const withThumbnailSlot = async task => {
+  if (thumbnailJobs >= 4) await new Promise(resolve => thumbnailWaiters.push(resolve));
+  thumbnailJobs++;
+  try { return await task(); }
+  finally { thumbnailJobs--; thumbnailWaiters.shift()?.(); }
 };
 const atomicWrite = async (destination, data, encoding) => {
   const temporary = path.join(path.dirname(destination), `.${path.basename(destination)}.${process.pid}.${Date.now()}.luma-tmp`);
@@ -68,6 +90,8 @@ const atomicCopy = async (source, destination) => {
   }
 };
 let sandboxFallbackUsed = false;
+let rendererRecoveryAttempts = 0, rendererRecoveryTimer = null, appIsQuitting = false;
+app.on('before-quit', () => { appIsQuitting = true; });
 const gpuCompatibilityMarker = path.join(app.getPath('userData'), 'gpu-compatibility-v1');
 let gpuCompatibilityApplied = process.platform === 'win32' && fs.existsSync(gpuCompatibilityMarker);
 if (gpuCompatibilityApplied) app.commandLine.appendSwitch('disable-gpu-sandbox');
@@ -104,11 +128,27 @@ function createWindow(useSandbox = true) {
       return;
     }
     console.error('Renderer process ended', details.reason, details.exitCode);
+    if (appIsQuitting || details.reason === 'clean-exit' || win.isDestroyed()) return;
+    rendererRecoveryAttempts++;
+    clearTimeout(rendererRecoveryTimer);
+    if (rendererRecoveryAttempts === 1) {
+      win.webContents.once('did-finish-load', () => dialog.showMessageBox(win, { type:'warning', title:'Luma Darkroom recovered', message:'The editing window stopped unexpectedly and was restored.', detail:'Your autosaved catalog has been reloaded. Review the most recent edit before continuing.', buttons:['Continue'], noLink:true }).catch(() => {}));
+      setTimeout(() => { if (!win.isDestroyed()) win.reload(); }, 150);
+      return;
+    }
+    if (rendererRecoveryAttempts === 2) {
+      setTimeout(() => { if (!win.isDestroyed()) win.destroy(); const replacement=createWindow(useSandbox);replacement.webContents.once('did-finish-load', () => dialog.showMessageBox(replacement, { type:'warning', title:'Luma Darkroom restarted', message:'The editing window was restarted after a second failure.', detail:'Your autosaved catalog remains available. If this repeats, reduce the active image size and report the problem.', buttons:['Continue'], noLink:true }).catch(() => {})); }, 150);
+      return;
+    }
+    dialog.showErrorBox('Luma Darkroom could not recover', 'The editing window stopped repeatedly. Your autosaved catalog remains on this computer. Restart Luma Darkroom and try a smaller image.');
+    app.quit();
   });
+  win.webContents.on('did-finish-load', () => { clearTimeout(rendererRecoveryTimer); rendererRecoveryTimer=setTimeout(() => { rendererRecoveryAttempts=0; }, 120_000); });
   win.webContents.on('preload-error', (_event, preloadPath, error) => console.error('Preload failed', preloadPath, error));
   win.webContents.on('did-fail-load', (_event, code, description) => console.error('Page load failed', code, description));
   win.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   win.loadFile(INDEX_PATH);
+  return win;
 }
 
 app.whenReady().then(() => {
@@ -193,14 +233,27 @@ app.whenReady().then(() => {
   });
   protocol.handle('local-image', async request => {
     try {
-      const filePath = new URL(request.url).searchParams.get('path');
+      const requestUrl = new URL(request.url), filePath = requestUrl.searchParams.get('path'), requestedThumbnail = Number(requestUrl.searchParams.get('thumb') || 0), thumbnailSize = Number.isFinite(requestedThumbnail) && requestedThumbnail > 0 ? Math.max(64, Math.min(1024, Math.round(requestedThumbnail))) : 0;
       if (!filePath || !path.isAbsolute(filePath) || !fs.existsSync(filePath)) return new Response('Not found', { status: 404 });
       const ext = path.extname(filePath).toLowerCase();
       const stat = await fs.promises.stat(filePath);
       let file,type=directImageTypes[ext];
       const maxInputBytes = type ? 256_000_000 : 2_000_000_000;
       if ((!type && !convertedImageTypes.has(ext)) || !stat.isFile() || stat.size > maxInputBytes) return new Response('Unsupported', { status: 403 });
-      if (type) {
+      if (thumbnailSize) {
+        const cacheKey=`${filePath}:${stat.mtimeMs}:${stat.size}:thumb:${thumbnailSize}`;
+        file=thumbnailCache.get(cacheKey);
+        if(!file){
+          let pending=pendingThumbnails.get(cacheKey);
+          if(!pending){
+            pending=withThumbnailSlot(()=>sharp(filePath,{failOn:'warning',limitInputPixels:100_000_000,animated:false}).rotate().resize({width:thumbnailSize,height:thumbnailSize,fit:'inside',withoutEnlargement:true,kernel:'lanczos3'}).jpeg({quality:84,progressive:true,chromaSubsampling:'4:4:4'}).toBuffer()).finally(()=>pendingThumbnails.delete(cacheKey));
+            pendingThumbnails.set(cacheKey,pending);
+          }
+          file=await pending;cacheThumbnail(cacheKey,file);
+        }
+        type='image/jpeg';
+      }
+      else if (type) {
         const metadata = await sharp(filePath, { failOn:'warning', limitInputPixels:100_000_000, animated:true }).metadata();
         const decodedPixels = Number(metadata.width || 0) * Number(metadata.height || 0) * Math.max(1, Number(metadata.pages || 1));
         if (!Number.isSafeInteger(decodedPixels) || decodedPixels <= 0 || decodedPixels > 100_000_000) {
@@ -220,7 +273,7 @@ app.whenReady().then(() => {
       }
       const body = new Uint8Array(file.byteLength);
       body.set(file);
-      return new Response(body, { headers: { 'Content-Type': type, 'Access-Control-Allow-Origin':'*', 'X-Content-Type-Options':'nosniff', 'Cache-Control':'private, max-age=3600' } });
+      return new Response(body, { headers: { 'Content-Type': type, 'Access-Control-Allow-Origin':'*', 'X-Content-Type-Options':'nosniff', 'Cache-Control':thumbnailSize?'private, max-age=300':'private, max-age=3600' } });
     } catch (error) {
       console.error('Image decode failed', error.message);
       return new Response('Image could not be decoded', { status: 422, headers: { 'Content-Type':'text/plain; charset=utf-8', 'Cache-Control':'no-store' } });

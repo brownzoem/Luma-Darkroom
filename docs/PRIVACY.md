@@ -8,7 +8,7 @@ application network API. The page Content Security Policy sets
 **connect-src 'none'**, and the main process does not implement an HTTP client
 workflow.
 
-This document describes the inspected 2.2.0 source. It is not a warranty,
+This document describes the inspected 2.3.0 source. It is not a warranty,
 privacy certification, or promise about modified builds, operating systems,
 package registries, hosting platforms, or other software.
 

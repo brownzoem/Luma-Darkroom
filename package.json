@@ -1,6 +1,6 @@
 {
   "name": "luma-darkroom",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "A local-first, non-destructive desktop photo workspace",
   "main": "electron/main.js",
   "author": "Luma Darkroom contributors",

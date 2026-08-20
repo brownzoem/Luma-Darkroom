@@ -3,7 +3,7 @@
 ## Purpose and assumptions
 
 This document records intended trust boundaries and known limitations of the
-2.2.0 codebase. It helps reviewers reason about changes; it is not a formal
+2.3.0 codebase. It helps reviewers reason about changes; it is not a formal
 audit, proof, certification, warranty, or legal guarantee.
 
 The model assumes:

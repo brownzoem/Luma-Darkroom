@@ -374,7 +374,9 @@ function applyKeyboardCanvasTool(){
   if(!toolMode)return toast('Choose an editing tool, then return to the photograph');canvasClick(event);updateKeyboardCanvasCursor()
 }
 function handleCanvasKeyboard(e){
-  keyboardCanvasActive=true;lastInputWasKeyboard=true;
+  lastInputWasKeyboard=true;
+  if(!toolMode){keyboardCanvasActive=false;updateKeyboardCanvasCursor();return}
+  keyboardCanvasActive=true;
   if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();const step=e.shiftKey ? .05 : .01;if(e.key==='ArrowLeft')keyboardCanvasPoint.x=Math.max(0,keyboardCanvasPoint.x-step);if(e.key==='ArrowRight')keyboardCanvasPoint.x=Math.min(1,keyboardCanvasPoint.x+step);if(e.key==='ArrowUp')keyboardCanvasPoint.y=Math.max(0,keyboardCanvasPoint.y-step);if(e.key==='ArrowDown')keyboardCanvasPoint.y=Math.min(1,keyboardCanvasPoint.y+step);updateKeyboardCanvasCursor();return}
   if(e.key==='Enter'){e.preventDefault();applyKeyboardCanvasTool()}else if(e.key==='Escape'){keyboardGradientStart=null;setTool('')}
 }

@@ -159,6 +159,7 @@ async function waitForPreview(page) {
   const zoomState = await page.evaluate(() => {
     const header = document.querySelector('body > header');
     const target = document.querySelector('.right');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', bubbles: true }));
     canvas.focus();
     updateKeyboardCanvasCursor();
     const canvasBox = canvas.getBoundingClientRect();

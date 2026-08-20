@@ -5,6 +5,40 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+### Added
+
+- Pressure-aware, geometrically resampled brush paths with immediate visual
+  feedback and one-step undo for each gesture.
+- Familiar brush, eraser, dodge/burn, hardness, size, zoom, Fit, temporary
+  subtract, and Space-pan keyboard shortcuts.
+- Bounded lazy thumbnail generation and caching for the Library and filmstrip.
+
+### Changed
+
+- Kept draft previews at a stable displayed size so painting no longer shrinks
+  the photograph, and coalesced live drafts without repeatedly restarting the
+  preview worker.
+- Stored compact brush paths with crop-consistent source sizing, reducing
+  catalog growth while keeping pointer and keyboard strokes aligned through
+  crop, rotate, flip, preview, and export.
+- Preserved the nearest-sampled appearance of masks saved by earlier releases
+  while using smoother bounded sampling for newly created masks.
+- Made zoomed canvases fully pannable, preserved image aspect after geometry
+  and window changes, softened live dodge/burn feedback, and gave repeated
+  local-light layers distinct names.
+- Sparse-encoded default catalog edits so large, lightly edited libraries use
+  substantially less local storage without dropping scalar profile or
+  black-and-white settings.
+
+### Reliability
+
+- Limited full-resolution neighbor prefetch to one image, bounded thumbnail
+  work and cache memory, and added one-shot renderer reload/restart recovery.
+- Applied mask-point budgets while parsing rather than after allocation, so a
+  hostile oversized path cannot create a large temporary sanitizer graph.
+- Added catalog persistence, brush workflow, crop-size, zoom/pan, pressure,
+  overlay lifecycle, shortcut-guard, and malformed-path regression coverage.
+
 ## 2.2.0 - 2026-08-19
 
 ### Added

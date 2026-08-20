@@ -51,6 +51,8 @@ self.onmessage = event => {
       type: 'rendered',
       token: sourceToken,
       id: message.id,
+      draft: !!message.draft,
+      preserveCanvas: !!message.preserveCanvas,
       width: canvas.width,
       height: canvas.height,
       bitmap

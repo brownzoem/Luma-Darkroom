@@ -25,6 +25,9 @@ Project website and user guide: <https://lumadarkroom.com>
 - Local exposure, color, clarity, blur, dodge, and burn controls plus bounded
   spot healing, clone sampling, and red-eye correction. Object and sky
   selections are offline heuristics, not semantic cloud AI.
+- Smooth pressure-aware brush paths, immediate in-progress feedback, familiar
+  brush shortcuts, and crop-consistent brush sizing for pointer and keyboard
+  workflows.
 - Curated color, portrait, landscape, cinematic, film, black-and-white, and
   HDR-style presets with an amount control.
 - Before/original comparison, two-photo comparison, a filmstrip, zoom, rotate,
@@ -36,8 +39,9 @@ Project website and user guide: <https://lumadarkroom.com>
 - Simple HDR averaging and panorama-strip helpers. They do not perform
   professional alignment, deghosting, exposure fusion, or feature-based
   stitching.
-- Autosaved local catalog with an in-progress recovery copy, a small last-good
-  snapshot, checksums, bounded undo history, and manual JSON backup/restore.
+- Sparse autosaved local catalog with an in-progress recovery copy, a small
+  last-good snapshot, checksums, bounded undo history, and manual JSON
+  backup/restore.
 - No runtime telemetry, accounts, cloud sync, advertising, or network API.
 
 ## Keyboard workflow
@@ -56,7 +60,14 @@ Shortcuts are ignored while typing in a field or while a dialog is open.
 | Open export | Ctrl or Cmd + E |
 | Open Help Center | F1 |
 | Move the active canvas tool cursor | Arrow keys; hold Shift for larger steps |
-| Apply the active canvas tool | Enter or Space |
+| Apply the active canvas tool | Enter |
+| Decrease / increase brush or repair size | [ / ] |
+| Make the brush edge softer / harder | Shift + [ / Shift + ] |
+| Select Add Brush / Subtract (Eraser) | B / E |
+| Select Dodge / cycle Dodge and Burn | O / Shift + O |
+| Temporarily subtract while painting | Hold Alt |
+| Pan a zoomed photograph | Hold Space and drag |
+| Zoom in / out / Fit | Ctrl + + / Ctrl + - / Ctrl + 0 |
 | Add / select / move / delete a tone-curve point | Enter / Ctrl + Left or Right / Arrow keys / Delete |
 
 ## Install

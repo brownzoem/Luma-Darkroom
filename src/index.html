@@ -36,7 +36,9 @@
         <button id="emptyImport" class="primary large">Choose photos</button><div class="drop">or drag & drop anywhere</div>
       </div>
       <div id="editor" class="editor hidden">
-        <div class="canvas-wrap" id="canvasWrap"><div id="checker"><canvas id="canvas" tabindex="0" role="application" aria-label="Photograph editing canvas. Use the arrow keys to position the keyboard cursor, then Enter to apply the active tool."></canvas><canvas id="liveBrushOverlay" class="live-brush-overlay hidden" width="1" height="1" aria-hidden="true"></canvas><div id="keyboardCanvasCursor" class="keyboard-canvas-cursor hidden" aria-hidden="true"></div><div id="gradientGuide" class="gradient-guide hidden"><i></i><button id="gradientStart" class="gradient-start" type="button" aria-label="Move gradient start"></button><button id="gradientEnd" class="gradient-end" type="button" aria-label="Move gradient end"></button><span aria-hidden="true"></span></div><div id="cloneSourceMarker" class="clone-source-marker hidden" aria-hidden="true"></div><div id="maskOverlay" class="mask-overlay hidden"></div></div>
+        <nav id="toolRail" class="tool-rail" aria-label="Editing tools" role="toolbar" aria-orientation="vertical"></nav>
+        <div id="toolOptions" class="tool-options" role="group" aria-label="Tool options"></div>
+        <div class="canvas-wrap" id="canvasWrap"><div id="checker"><canvas id="canvas" tabindex="0" role="application" aria-label="Photograph editing canvas. Use the arrow keys to position the keyboard cursor, then Enter to apply the active tool."></canvas><canvas id="liveBrushOverlay" class="live-brush-overlay hidden" width="1" height="1" aria-hidden="true"></canvas><div id="keyboardCanvasCursor" class="keyboard-canvas-cursor hidden" aria-hidden="true"></div><div id="gradientGuide" class="gradient-guide hidden"><i></i><button id="gradientStart" class="gradient-start" type="button" aria-label="Move gradient start"></button><button id="gradientEnd" class="gradient-end" type="button" aria-label="Move gradient end"></button><span aria-hidden="true"></span></div><div id="cloneSourceMarker" class="clone-source-marker hidden" aria-hidden="true"></div><canvas id="toolOverlay" class="tool-overlay hidden" width="1" height="1" aria-hidden="true"></canvas><div id="cropHandles" class="crop-handles hidden" aria-hidden="true"></div></div>
           <div class="editor-tools"><button id="pickColorBtn" title="Pick a color from the photo" aria-pressed="false">⌖ Color</button><button id="focusModeBtn" title="Click a subject or object to create an image-aware mask" aria-pressed="false">◉ Subject</button><button id="cleanupModeBtn" title="Click blemishes or dust spots" aria-pressed="false">✦ Cleanup</button><span></span><button id="fitBtn">Fit</button><input id="zoomRange" aria-label="Zoom" type="range" min="25" max="200" value="100"><output id="zoomLabel" for="zoomRange">Fit</output></div>
         </div>
       </div>
@@ -68,7 +70,7 @@
   <dialog id="modelDownloadDialog" aria-labelledby="modelDownloadTitle" aria-describedby="modelDownloadCopy"><form method="dialog"><header><h2 id="modelDownloadTitle">Add local selection model</h2><button id="modelDownloadClose" value="cancel" aria-label="Close model download">×</button></header><p id="modelDownloadCopy">This optional model runs on this computer. Photographs are not uploaded.</p><div class="model-card"><b id="modelDownloadName"></b><span id="modelDownloadSize"></span><small>Apache-2.0 model pack · immutable source · exact hash verified before use · removable in Help</small></div><p class="curve-help">The upstream model publisher does not provide this project with a warranty for every training image. The pack is optional and is never bundled silently.</p><div id="modelDownloadProgress" class="model-progress hidden" role="progressbar" aria-label="Model download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i><span>Preparing…</span></div><p id="modelDownloadError" class="guide-status hidden" role="alert"></p><div class="dialog-actions"><button id="modelDownloadCancel" type="button" class="ghost">Cancel</button><button id="modelDownloadStart" type="button" class="primary">Download &amp; continue</button></div></form></dialog>
   <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle" aria-describedby="helpIntro">
     <form method="dialog">
-      <header><div><div class="dialog-kicker">LUMA DARKROOM 2.4.0</div><h2 id="helpTitle">Help Center</h2></div><button value="cancel" aria-label="Close Help Center">×</button></header>
+      <header><div><div class="dialog-kicker">LUMA DARKROOM 3.0.0</div><h2 id="helpTitle">Help Center</h2></div><button value="cancel" aria-label="Close Help Center">×</button></header>
       <p id="helpIntro" class="help-intro">Learn the workflow, review shortcuts, or open the installation and user guide.</p>
       <div class="help-actions">
         <button id="startTutorialBtn" type="button" class="primary">Start interactive tutorial</button>
@@ -78,13 +80,27 @@
       <section class="help-section" aria-labelledby="shortcutsTitle">
         <h3 id="shortcutsTitle">Keyboard shortcuts</h3>
         <div class="shortcut-grid">
-          <span>Open Help</span><kbd>F1</kbd>
+          <span>Open Help</span><kbd>F1 or ?</kbd>
           <span>Undo / Redo</span><kbd>Ctrl Z / Ctrl Shift Z</kbd>
           <span>Export</span><kbd>Ctrl E</kbd>
-          <span>Library / Develop</span><kbd>G / D</kbd>
+          <span>Move / Transform photo</span><kbd>V</kbd>
+          <span>Marquee select (cycle shape)</span><kbd>M / Shift M</kbd>
+          <span>Lasso (cycle polygonal)</span><kbd>L / Shift L</kbd>
+          <span>Auto select (wand)</span><kbd>W</kbd>
+          <span>Pen (vector select)</span><kbd>P</kbd>
+          <span>Crop &amp; shape crop</span><kbd>C</kbd>
+          <span>Gradient mask (cycle radial)</span><kbd>G / Shift G</kbd>
+          <span>Color sampler / Heal</span><kbd>I / J</kbd>
+          <span>Zoom / Hand tool</span><kbd>Z / H</kbd>
+          <span>Add to / subtract / intersect selection</span><kbd>Shift / Alt / Shift Alt + draw</kbd>
+          <span>Deselect / Invert mask</span><kbd>Ctrl D / Ctrl Shift I</kbd>
+          <span>Select all</span><kbd>Ctrl A</kbd>
+          <span>Crop: apply / cancel</span><kbd>Enter / Esc</kbd>
+          <span>Crop: guides / swap aspect</span><kbd>O / X</kbd>
+          <span>Library / Develop</span><kbd>G (in Library) / D</kbd>
           <span>Previous / Next photo</span><kbd>← / →</kbd>
           <span>Set rating</span><kbd>0–5</kbd>
-          <span>Pick / Reject / Clear flag</span><kbd>P / X / U</kbd>
+          <span>Pick / Reject / Clear flag (Library)</span><kbd>P / X / U</kbd>
           <span>Show original</span><kbd>Hold \</kbd>
           <span>Move canvas tool cursor</span><kbd>Arrow keys</kbd>
           <span>Apply canvas tool</span><kbd>Enter</kbd>
@@ -124,6 +140,6 @@
   </dialog>
   <div id="brushCursor" class="brush-cursor hidden" aria-hidden="true"></div>
   <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-  <script src="engine.js"></script><script src="ai-client.js"></script><script src="app.js"></script>
+  <script src="engine.js"></script><script src="ai-client.js"></script><script src="app.js"></script><script src="tools.js"></script><script src="crop-tool.js"></script>
 </body>
 </html>

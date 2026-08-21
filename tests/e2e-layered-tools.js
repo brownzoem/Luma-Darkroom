@@ -147,7 +147,7 @@ async function previewExportParity(page) {
     const migratedPixels = pixels(E.render(subject, migratedLegacy, { maxEdge: 180 }));
     const inertLegacy = E.migratedEdits({ version: 2, mask: { enabled: false, type: 'subject' } });
     const legacyState = {
-      version: migratedLegacy.version,
+      versionCurrent: migratedLegacy.version === E.EDIT_SCHEMA_VERSION,
       activeId: migratedLegacy.masks.activeId,
       layers: migratedLegacy.masks.layers.length,
       type: migratedLegacy.masks.layers[0]?.type,
@@ -703,7 +703,7 @@ async function previewExportParity(page) {
 
   const failures = [];
   const legacy = engine.legacyState;
-  if (legacy.version !== 7 || legacy.layers !== 1 || legacy.activeId !== 'legacy-mask' || legacy.type !== 'subject' || legacy.space !== 'frame' || legacy.exposure !== 0.55 || legacy.strokes !== 1 || legacy.protectTones !== false || legacy.parityMaxDelta !== 0 || legacy.inertLayers !== 0) failures.push('Version 2 local-mask migration lost state or render parity');
+  if (!legacy.versionCurrent || legacy.layers !== 1 || legacy.activeId !== 'legacy-mask' || legacy.type !== 'subject' || legacy.space !== 'frame' || legacy.exposure !== 0.55 || legacy.strokes !== 1 || legacy.protectTones !== false || legacy.parityMaxDelta !== 0 || legacy.inertLayers !== 0) failures.push('Version 2 local-mask migration lost state or render parity');
   const sanitize = engine.sanitizedState;
   if (sanitize.layers !== 8 || sanitize.totalStrokes !== 1024 || sanitize.maximumLayerStrokes !== 256 || sanitize.uniqueIds !== 8 || !sanitize.safeIds || !sanitize.namesBounded || !sanitize.typesSafe || !sanitize.activeValid || sanitize.boundedLayer.x !== 0 || sanitize.boundedLayer.y !== 1 || sanitize.boundedLayer.opacity !== 100 || sanitize.boundedLayer.brushSize !== 100 || sanitize.cleanup !== 200 || sanitize.boundedCleanup.x !== 0 || sanitize.boundedCleanup.y !== 1 || sanitize.boundedCleanup.radiusPx !== 100000 || sanitize.boundedCleanup.size !== 25 || sanitize.boundedCleanup.opacity !== 1 || sanitize.boundedCleanup.kind !== 'heal') failures.push('Mask or repair sanitization limits failed');
   const gradients = engine.gradients;

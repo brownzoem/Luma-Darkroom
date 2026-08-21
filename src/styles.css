@@ -85,3 +85,76 @@ dialog:not(.tutorial-dialog){max-height:calc(100vh - 28px);overflow:auto}dialog 
 
 /* Local custom-preset management stays compact inside the existing Presets tab. */
 .preset-manager{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:9px}.preset-manager button,.preset-actions button{border:1px solid var(--line);border-radius:5px;background:#252a2f;padding:6px 4px;font-size:9px}.preset-manager button:disabled{opacity:.35;cursor:default}.preset-manager span{grid-column:1/-1;color:var(--muted);font-size:9px;text-align:right}.preset-entry{min-width:0}.preset-entry>.preset{width:100%}.preset.active{outline:2px solid var(--accent);outline-offset:1px}.custom-preset>.preset{border-bottom-left-radius:0;border-bottom-right-radius:0}.preset-actions{display:grid;grid-template-columns:1fr 1fr}.preset-actions button{border-top:0;border-radius:0;padding:5px}.preset-actions button:first-child{border-bottom-left-radius:6px}.preset-actions button:last-child{border-bottom-right-radius:6px;color:#ff9ca3}.preset-empty{grid-column:1/-1;color:var(--muted);font-size:10px;line-height:1.5;text-align:center;padding:18px 8px}.preset-scope{display:flex;align-items:center;gap:8px}.preset-scope>input{width:auto!important;margin:0!important;accent-color:var(--accent)}.preset-scope-note{color:var(--muted);font-size:10px;line-height:1.45}.danger-button{border:1px solid #9b444c;border-radius:7px;background:#7c3038;color:#fff;padding:8px 13px;font-weight:600}.danger-button:hover{background:#963b45}
+
+/* ============================================================================
+   Tool rail, options bar, selection overlays, and crop tool (v3.0)
+   New-code conventions: kebab-case classes, one rule per line, grouped by
+   component. These rules extend the layout without touching earlier blocks.
+   ============================================================================ */
+
+/* --- Editor grid: rail on the left, options bar above the canvas --- */
+.editor{display:grid;grid-template-columns:46px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:0}
+#toolRail{grid-column:1;grid-row:1/4}
+#toolOptions{grid-column:2;grid-row:1}
+.editor .canvas-wrap{grid-column:2;grid-row:2}
+.editor .editor-tools{grid-column:2;grid-row:3}
+
+/* --- Tool rail --- */
+.tool-rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 5px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto}
+.tool-rail-btn{width:32px;height:32px;flex:0 0 auto;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);font:600 12.5px/1 "Segoe UI",system-ui,sans-serif;cursor:pointer;display:grid;place-items:center}
+.tool-rail-btn:hover{background:var(--panel3);color:var(--text)}
+.tool-rail-btn.active{background:#4b2b31;border-color:var(--accent);color:var(--text)}
+.tool-rail-btn:focus-visible{outline:2px solid #f5b66f;outline-offset:1px}
+
+/* --- Options bar --- */
+.tool-options{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:34px;padding:4px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+.tool-option-title{color:var(--text);font-size:12px;letter-spacing:.02em}
+.tool-option-label{color:var(--muted);font-size:11.5px}
+.tool-option-hint{color:var(--muted);font-size:11.5px;opacity:.85}
+.tool-options select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px}
+.tool-options input[type=range]{width:96px}
+.tool-options output{min-width:2ch;color:var(--text)}
+.tool-check{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;cursor:pointer}
+.tool-segment{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.tool-segment button{border:0;background:var(--panel2);color:var(--muted);padding:4px 9px;font-size:11.5px;cursor:pointer}
+.tool-segment button+button{border-left:1px solid var(--line)}
+.tool-segment button.active{background:#4b2b31;color:var(--text)}
+.tool-options .primary-quiet{border-color:var(--accent);background:#4b2b31;color:var(--text)}
+
+/* --- Checkerboard behind the photo so shape-crop transparency reads truthfully --- */
+#checker{background:repeating-conic-gradient(#212427 0% 25%,#2b2f33 0% 50%) 0 0/18px 18px}
+
+/* --- Shared tool overlay (marching ants, previews, transform + crop chrome) --- */
+.tool-overlay{position:absolute;inset:0;z-index:5;pointer-events:none}
+
+/* --- Crop handles --- */
+.crop-handles{position:absolute;inset:0;z-index:6;pointer-events:none}
+.crop-handle{position:absolute;width:13px;height:13px;transform:translate(-50%,-50%);pointer-events:auto;background:#fff;border:1.5px solid #1c1e21;border-radius:2.5px;padding:0;cursor:pointer}
+.crop-handle:focus-visible{outline:2px solid #f5b66f;outline-offset:1px}
+.crop-handle-nw,.crop-handle-se{cursor:nwse-resize}
+.crop-handle-ne,.crop-handle-sw{cursor:nesw-resize}
+.crop-handle-n,.crop-handle-s{cursor:ns-resize}
+.crop-handle-e,.crop-handle-w{cursor:ew-resize}
+
+/* --- Per-tool canvas cursors --- */
+#canvas[data-tool="tool-marquee"],#canvas[data-tool="tool-lasso"],#canvas[data-tool="tool-wand"],#canvas[data-tool="tool-pen"]{cursor:crosshair}
+#canvas[data-tool="tool-move"]{cursor:move}
+#canvas[data-tool="tool-crop"]{cursor:crosshair}
+#canvas[data-tool="tool-hand"]{cursor:grab}
+#canvas[data-tool="tool-zoom"]{cursor:zoom-in}
+
+/* --- Narrow screens: keep the rail usable --- */
+@media (max-width:760px){
+  .editor{grid-template-columns:40px minmax(0,1fr)}
+  .tool-rail{padding:6px 3px}
+  .tool-rail-btn{width:30px;height:30px}
+}
+
+/* --- Tool rail icons --- */
+.tool-rail-btn svg{width:17px;height:17px;display:block}
+
+/* --- Rail scroll behavior: scrollable but without a space-stealing scrollbar,
+       so buttons never clip at narrow/short layouts (they stay centered). --- */
+.tool-rail{scrollbar-width:none}
+.tool-rail::-webkit-scrollbar{display:none}
+.tool-rail-btn{max-width:100%}

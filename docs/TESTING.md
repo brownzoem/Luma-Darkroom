@@ -52,7 +52,17 @@ The suite includes:
   targeting, event-loop responsiveness, cancellation, and worker cleanup.
 - a brush-workflow pass covering compact paths, coarse/coalesced and
   pressure-varying strokes, stable draft layout, crop-consistent sizing,
-  shortcut guards, overlay lifecycle, and zoom/pan geometry.
+  shortcut guards, overlay lifecycle, and zoom/pan geometry;
+- a selection-tools pass driving the tool rail with real mouse and keyboard
+  input: freehand and polygonal lasso, marquee and preset-shape selections
+  with combine modifiers, magic wand, pen paths, Move/Transform pan and
+  corner zoom, geometry-mask rendering, undo/redo storms, and the
+  deselect/invert shortcuts;
+- a crop-and-transform pass covering crop handles, aspect lock, shape crops
+  with verified alpha output, exact Esc-cancel restoration, catalog reload
+  persistence, rotate/flip coordinate round-trips, hostile-region
+  sanitization, mask-layer limits, degenerate gestures, and exact
+  preview/export worker parity.
 
 Tests create synthetic redistributable image fixtures in the operating-system
 temporary directory. Test profiles and screenshots must not be committed.

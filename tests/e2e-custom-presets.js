@@ -26,7 +26,13 @@ async function livePage(runningApp, errors) {
   page.on('pageerror', error => errors.push(`PAGE: ${error.stack || error}`));
   page.on('console', message => { if (message.type() === 'error') errors.push(`CONSOLE: ${message.text()}`); });
   await page.waitForSelector('body', { timeout: 15_000 });
-  if (await page.locator('#tutorialDialog[open]').count()) await page.click('#tutorialSkip');
+  // The first-run tutorial is scheduled ~450ms after startup on a fresh
+  // profile; wait for it instead of racing it, then dismiss it.
+  await page.locator('#tutorialDialog[open]').waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+  if (await page.locator('#tutorialDialog[open]').count()) {
+    await page.click('#tutorialSkip');
+    await page.locator('#tutorialDialog').waitFor({ state: 'hidden' });
+  }
   return page;
 }
 

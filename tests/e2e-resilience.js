@@ -85,7 +85,8 @@ async function livePage(app) {
   await page.waitForFunction(() => canvas.width > 500, null, { timeout: 30000 });
 
   // Library actions must expose one unambiguous active target while selections remain batch targets.
-  await page.keyboard.press('g');
+  // (v3.0: in Develop, G selects the Gradient tool, so switch views through the tab.)
+  await page.click('.tab[data-view="library"]');
   await page.locator('.card').nth(1).press('Space');
   await page.waitForFunction(() => current?.id === 'qa-1' && view === 'library');
   results.targeting = await page.evaluate(() => ({
@@ -264,7 +265,7 @@ async function livePage(app) {
 
   // Leaving Develop should not leave a destructive click tool armed.
   if ((await page.evaluate(() => toolMode)) !== 'cleanup') await page.click('#cleanupModeBtn');
-  await page.keyboard.press('g');
+  await page.click('.tab[data-view="library"]');
   results.toolExit = await page.evaluate(() => ({ view, toolMode }));
 
   // Rapid keyboard culling should settle on the requested image without stale renders.

@@ -8,6 +8,7 @@ function applyClipping(canvas) {
   const image = context.getImageData(0, 0, canvas.width, canvas.height);
   const pixels = image.data;
   for (let index = 0; index < pixels.length; index += 4) {
+    if (pixels[index + 3] < 8) continue;
     const shadows = Math.max(pixels[index], pixels[index + 1], pixels[index + 2]) < 4;
     const highlights = Math.min(pixels[index], pixels[index + 1], pixels[index + 2]) > 251;
     if (shadows) {

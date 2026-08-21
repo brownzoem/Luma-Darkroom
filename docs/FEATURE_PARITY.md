@@ -27,7 +27,9 @@ size and SHA-256, and run locally; photographs are not uploaded for selection.
 | Fringe color reduction | Limited | Purple and green fringe-hue reduction; no spatial channel realignment. |
 | Geometric corrections | Limited | Manual vertical, horizontal, rotation, aspect, scale, and offset controls; no automatic line detection. |
 | Camera calibration | Limited | Decoded-RGB primary mixing and shadow tint; it does not replace a camera profile or RAW pipeline. |
-| Crop and straighten | Available | Aspect presets, crop zoom and offset, straighten, rotate, flip, and constrained crop. |
+| Crop and straighten | Available | Interactive on-canvas crop with drag handles, aspect presets and lock, drag-to-straighten, guide overlays, rotate, flip, and constrained crop. |
+| Shape crops | Available | Oval, rounded, star, heart, polygon, arrow, and selection-outline crop shapes with feathered edges; PNG/WebP/TIFF exports keep the transparency and JPEG flattens to white. |
+| Photo transform inside crop | Available | Drag the photo under the crop to reposition it; corner handles zoom, edge handles stretch/distort, all non-destructive. |
 | Lens blur | Limited | Mask-local inside/outside Gaussian blur; no depth map, focus plane, bokeh-shape simulation, or highlight model. |
 | Post-crop vignette | Available | Amount, midpoint, roundness, feather, and highlight protection after crop geometry. |
 | HDR edit and output | Not available | Exposure averaging produces an ordinary SDR image; there is no floating-point HDR display or export path. |
@@ -40,6 +42,11 @@ size and SHA-256, and run locally; photographs are not uploaded for selection.
 | Capability | Status | Current behavior |
 | --- | --- | --- |
 | Layered masks | Available | Up to eight named, ordered, invertible, duplicable, hideable masks with per-layer opacity and independent local edits. |
+| Freehand and polygonal lasso selections | Available | Single-key lasso tools with marching-ants feedback; selections become editable mask layers with the full local-adjustment set. |
+| Marquee and preset-shape selections | Available | Rectangle, ellipse, and preset shapes (star, heart, polygons, arrow) drawn on canvas with square/from-center modifiers. |
+| Vector pen selections | Available | Click-and-drag cubic-curve paths with editable anchors and handles after closing. |
+| Magic-wand selection | Available | Click-to-select by color similarity with tolerance and contiguous controls; combines with every other selection. |
+| Selection combine modes | Available | New, add (Shift), subtract (Alt), and intersect (Shift+Alt) for all selection tools, plus deselect and invert shortcuts. |
 | Brushes | Available | Pressure-aware compact paths, live feedback, Add/Subtract, source anchoring, one gesture per undo, and size/hardness shortcuts. |
 | Linear and radial gradients | Available | Two-point source-anchored gradients with editable local settings. |
 | Color and luminance range masks | Available | Sampled H/S/L range and luminance range intersections with feathering. |

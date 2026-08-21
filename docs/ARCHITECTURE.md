@@ -20,8 +20,9 @@ boundaries:
 There is no runtime web server, frontend bundler, account service, photo upload,
 or application backend. The main process can fetch optional local-selection
 models from fixed HTTPS asset URLs after explicit approval.
-The renderer loads **src/index.html**, **src/styles.css**, **src/engine.js**, and
-**src/app.js** directly from the installed application. Preview and export jobs
+The renderer loads **src/index.html**, **src/styles.css**, **src/engine.js**,
+**src/app.js**, **src/tools.js**, and **src/crop-tool.js** directly from the
+installed application. Preview and export jobs
 load **src/preview-worker.js** or **src/render-worker.js** and the same engine in
 a worker context.
 
@@ -88,6 +89,34 @@ The application layer:
 - contains user-facing recovery for async, decode, render, storage, and export
   failures, including a bounded renderer reload/restart path.
 
+### src/tools.js
+
+The tool layer. It loads after src/app.js, shares its global scope, and adds:
+
+- the vertical tool rail (icon buttons, one per tool) and the contextual
+  options bar, including selection combine modes and per-tool settings;
+- the on-canvas selection tools — marquee (rect/ellipse/preset shapes),
+  freehand and polygonal lasso, magic wand, and pen — which convert pointer
+  gestures into source-anchored `geometry` mask regions through a single
+  undo commit each;
+- the Move/Transform tool (pan, corner zoom, edge stretch of the photo);
+- a shared overlay canvas that draws marching ants, in-progress previews,
+  pen anchors/handles, and transform frames on every animation frame, with
+  a fast idle bail-out;
+- capture-phase pointer routing on the canvas wrap so tool gestures run
+  before the legacy brush/pan handlers, and a capture-phase key handler for
+  single-key tool shortcuts that defers to dialogs and text fields.
+
+### src/crop-tool.js
+
+The interactive crop mode, registered with the tool layer. While active the
+photo renders uncropped; the module owns the crop rectangle (handles, aspect
+lock, straighten-by-dragging-outside, guide overlays), shape crops
+(parametric shapes or the active selection outline, with feather), and the
+photo transform under the crop (drag to pan, corner handles zoom, edge
+handles stretch). Apply writes `geometry.cropL/T/R/B` plus the `cropShape*`
+fields and records one history step; cancel restores the entry snapshot.
+
 ### src/engine.js
 
 The engine is a browser-global module. It provides:
@@ -95,9 +124,13 @@ The engine is a browser-global module. It provides:
 - the versioned default edit schema;
 - defensive merge and old-schema migration;
 - photo-record normalization;
-- orientation, flip, transform, and crop;
+- orientation, flip, transform, and crop (legacy zoom/offset crop plus the
+  rectangle crop, non-uniform stretch, and feathered shape-crop alpha);
 - tone, curve, color, mixer, point-color, grading, masks, vignette, grain,
   detail, focus blur, retouch, and watermark processing;
+- geometry mask regions: polygon, cubic-curve, parametric-shape, and
+  magic-wand regions rasterized with add/subtract/intersect compositing
+  inside the bounded mask pipeline;
 - image-quality analysis.
 
 It accepts an already decoded image plus edit state and returns a canvas.

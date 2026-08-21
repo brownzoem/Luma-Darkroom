@@ -5,6 +5,67 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+## 3.0.0 - 2026-08-20
+
+### Added
+
+- A vertical editing tool rail with crisp monochrome icons and the single-key
+  shortcuts professional editors expect — V Move/Transform, M Marquee,
+  L Lasso, W Auto select, P Pen, B Brush, E Eraser, G Gradient, C Crop,
+  I Color sampler, J Heal, Z Zoom, H Hand — plus a contextual options bar for
+  each tool.
+- On-canvas selection tools that create non-destructive "Selection" mask
+  layers with marching-ants feedback: freehand lasso, polygonal lasso
+  (click points, Enter/double-click closes, Backspace removes), rectangular
+  and elliptical marquee (Shift constrains square, Alt draws from center),
+  preset-shape marquee (star, heart, triangle, diamond, pentagon, hexagon,
+  rounded, arrow), a color-similarity magic wand with tolerance and contiguous
+  controls, and a vector pen with click-for-corner / drag-for-curve input and
+  editable anchors and handles after closing.
+- Selection combine modes across every selection tool: New, Add (Shift),
+  Subtract (Alt), and Intersect (Shift+Alt), plus Ctrl+D deselect,
+  Ctrl+Shift+I invert, and Ctrl+A select-all. Every selection supports the
+  full local-adjustment set, edge feathering, tone/range intersections,
+  opacity, and add/subtract brush refinement, and stays anchored through
+  crop, rotate, and flip.
+- An interactive on-canvas crop tool: eight drag handles, aspect presets with
+  ratio lock and X orientation swap, drag-outside-to-straighten, cycling
+  guide overlays (thirds, golden, grid), arrow-key nudging, Enter/Esc
+  apply/cancel, and a live full-frame preview while cropping.
+- Shape crops: crop the photo to an oval, rounded rectangle, star, heart,
+  triangle, diamond, pentagon, hexagon, arrow, or the outline of the active
+  selection, with a feathered-edge control. Transparency is preserved in
+  PNG/WebP/TIFF exports and flattened to white for JPEG; the workspace
+  shows a checkerboard behind transparent areas.
+- Photo transform inside the crop: drag the photo to reposition it under the
+  crop window, drag its corner handles to zoom in or out, and drag its edge
+  handles to stretch/distort horizontally or vertically — available in crop
+  mode and through the Move/Transform (V) tool, with a one-step history
+  entry per gesture and a reset control.
+- A magic-wand and geometry-selection engine (schema version 8): polygon,
+  cubic-curve, parametric-shape, and wand regions rasterize inside the same
+  bounded mask pipeline with per-region add/subtract/intersect compositing,
+  strict sanitization, point budgets, and full catalog persistence.
+
+### Changed
+
+- The mask panel now lists geometry selections as regular layers with a
+  region summary, an "Add to selection on photo" action, and a
+  clear-regions control.
+- The Help Center and README document the expanded keyboard map, including
+  context notes for Library-view culling keys that share letters with
+  Develop-view tools.
+- Legacy zoom/offset crops are read transparently: opening the crop tool on
+  an older edit converts it to the new rectangle model on apply, and older
+  catalogs render pixel-identically without modification.
+
+### Fixed
+
+- The preview clipping indicator no longer marks fully transparent
+  shape-crop pixels as crushed shadows.
+- Shape and crop rotations wrap at ±180° instead of clamping, so extreme
+  rotation values migrate cleanly.
+
 ## 2.4.0 - 2026-08-20
 
 ### Added

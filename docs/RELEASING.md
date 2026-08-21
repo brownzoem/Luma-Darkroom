@@ -64,7 +64,15 @@ Minimum manual matrix:
 - rapid arrows, 0–5 ratings, P/X/U flags, G/D views, held original, undo/redo;
 - every develop panel, preset replacement and amount, layered object/sky/brush/
   gradient masks, reorder/invert/opacity/add/subtract, dodge/burn, clone/heal/
-  red-eye, cleanup cap, rotate, flip, crop, zoom, and reset;
+  red-eye, cleanup cap, rotate, flip, zoom, and reset;
+- the tool rail end to end: lasso and polygonal lasso, marquee (rect, ellipse,
+  preset shape) with Shift/Alt combine and constrain modifiers, magic wand
+  tolerance and contiguous, pen paths with anchor editing, Move/Transform pan
+  and corner/edge handles, Ctrl+D / Ctrl+Shift+I, and marching-ants overlay;
+- the crop tool: handles, aspect presets and X swap, drag-outside straighten,
+  guide cycling with O, shape crops (including "From selection") with feather,
+  photo pan/zoom/stretch inside the crop, Enter apply / Esc cancel, and a
+  transparent-PNG plus flattened-JPEG shape-crop export;
 - close/relaunch autosave, recovery selection, quota failure, valid backup,
   corrupt backup, duplicate IDs, duplicate paths, and legacy migration;
 - two-photo compare, analysis, batch sync, exposure average (SDR), panorama bounds;

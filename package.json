@@ -1,6 +1,6 @@
 {
   "name": "luma-darkroom",
-  "version": "2.4.0",
+  "version": "3.0.0",
   "description": "A local-first, non-destructive desktop photo workspace",
   "main": "electron/main.js",
   "author": "Luma Darkroom contributors",
@@ -23,7 +23,8 @@
     "build:icons": "node scripts/build-icons.js",
     "build:native-source": "node scripts/build-native-source-bundle.js",
     "build:notices": "node scripts/build-notice-bundle.js",
-    "check:syntax": "node --check electron/main.js && node --check electron/preload.js && node --check electron/model-manager.js && node --check electron/custom-presets.js && node --check src/engine.js && node --check src/render-worker.js && node --check src/preview-worker.js && node --check src/ai-client.js && node --check src/ai-segmentation-worker.js && node --check src/app.js",
+    "lint": "eslint .",
+    "check:syntax": "node --check electron/main.js && node --check electron/preload.js && node --check electron/model-manager.js && node --check electron/custom-presets.js && node --check src/engine.js && node --check src/render-worker.js && node --check src/preview-worker.js && node --check src/ai-client.js && node --check src/ai-segmentation-worker.js && node --check src/app.js && node --check src/tools.js && node --check src/crop-tool.js",
     "test:smoke": "node tests/e2e-smoke.js",
     "test:regression": "node tests/e2e-regression.js",
     "test:resilience": "node tests/e2e-resilience.js",
@@ -31,6 +32,8 @@
     "test:brush-workflow": "node tests/e2e-brush-workflow.js",
     "test:legacy-migration": "node tests/e2e-legacy-edit-migration.js",
     "test:layered-tools": "node tests/e2e-layered-tools.js",
+    "test:selection-tools": "node tests/e2e-selection-tools.js",
+    "test:crop-transform": "node tests/e2e-crop-transform.js",
     "test:keyboard-accessibility": "node tests/e2e-keyboard-accessibility.js",
     "test:export-worker": "node tests/e2e-export-worker.js",
     "test:model-manager": "node --test tests/model-manager.test.js",
@@ -41,7 +44,7 @@
     "test:feature-parity": "node --test tests/feature-parity-contract.test.js",
     "test:packaged": "node tests/packaged-smoke.js",
     "test:packaged-asar": "set LUMA_PACKAGED_ASAR=1&& node tests/packaged-smoke.js",
-    "test": "npm run check:syntax && npm run test:feature-parity && npm run test:model-manager && npm run test:semantic-masks && npm run test:ai-segmentation && npm run test:point-color && npm run test:custom-presets && npm run test:smoke && npm run test:regression && npm run test:resilience && npm run test:interaction && npm run test:brush-workflow && npm run test:legacy-migration && npm run test:layered-tools && npm run test:keyboard-accessibility && npm run test:export-worker",
+    "test": "npm run check:syntax && npm run lint && npm run test:feature-parity && npm run test:model-manager && npm run test:semantic-masks && npm run test:ai-segmentation && npm run test:point-color && npm run test:custom-presets && npm run test:smoke && npm run test:regression && npm run test:resilience && npm run test:interaction && npm run test:brush-workflow && npm run test:legacy-migration && npm run test:layered-tools && npm run test:selection-tools && npm run test:crop-transform && npm run test:keyboard-accessibility && npm run test:export-worker",
     "verify:notices": "node scripts/fetch-upstream-notices.js --check",
     "verify:notices:upstream": "node scripts/fetch-upstream-notices.js --check-upstream",
     "verify:release": "node scripts/verify-windows-release.js",
@@ -52,6 +55,7 @@
     "@electron/asar": "^3.4.1",
     "electron": "^43.4.0",
     "electron-builder": "^26.0.12",
+    "eslint": "^9.39.5",
     "playwright-core": "^1.62.1"
   },
   "build": {

@@ -173,7 +173,8 @@ async function waitForPreview(page) {
   const maskState = await page.evaluate(() => ({
     modes: activeMask().strokes.map(stroke => stroke.mode),
     history: historyStacks()[0].length,
-    legacyOverlayHidden: document.querySelector('#maskOverlay').classList.contains('hidden')
+    // v3.0 removed the never-shown legacy #maskOverlay element entirely; its absence is the contract now.
+    legacyOverlayRemoved: !document.querySelector('#maskOverlay')
   }));
 
   await page.click('#editPanelTab');
@@ -241,7 +242,7 @@ async function waitForPreview(page) {
   if (hardBrushPixels < 20) failures.push('A zero-feather mask brush did not paint a hard edge');
   if (addedMask.covered <= baseMask.covered) failures.push('Add brush did not increase mask coverage');
   if (subtractedMask.covered >= addedMask.covered) failures.push('Subtract brush did not reduce mask coverage');
-  if (!maskState.modes.includes('add') || !maskState.modes.includes('subtract') || historyAfterAdd !== historyBefore + 1 || maskState.history !== historyAfterAdd + 1 || !maskState.legacyOverlayHidden) failures.push('Mask refinement state or one-gesture undo history failed');
+  if (!maskState.modes.includes('add') || !maskState.modes.includes('subtract') || historyAfterAdd !== historyBefore + 1 || maskState.history !== historyAfterAdd + 1 || !maskState.legacyOverlayRemoved) failures.push('Mask refinement state or one-gesture undo history failed');
   if (!responsiveness.workerReady || responsiveness.workerBusy || responsiveness.pending || responsiveness.heartbeatTicks < 10 || responsiveness.maxHeartbeatGap > 200 || !responsiveness.previewRevisionAdvanced || responsiveness.settledWidth < 1050 || dragMs > 4000) failures.push('Slider preview was blocking, stale, or failed to restore high quality');
   if (!brushCursor.visible || brushCursor.width < 8) failures.push('Mask brush radius cursor was not visible');
   if (zoomEdgePolicy.fit !== 1050 || zoomEdgePolicy.zoomed !== 2100) failures.push('Preview resolution did not scale from its minimum fit resolution when zoomed');

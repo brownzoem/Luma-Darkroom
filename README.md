@@ -18,11 +18,29 @@ Project website and user guide: <https://lumadarkroom.com>
 - Non-destructive develop controls for profiles, light, tone curves, white
   balance, vibrance, saturation, an eight-channel color mixer, point color,
   color grading, effects, detail, optics, and geometry.
+- A vertical tool rail with the single-key tools professional editors expect:
+  Move/Transform (V), rectangular/elliptical/preset-shape marquee (M),
+  freehand and polygonal lasso (L), magic-wand auto select (W), vector pen
+  paths with editable anchors (P), mask brush and eraser (B/E), gradients (G),
+  crop (C), color sampler (I), heal (J), zoom (Z), and hand (H) — each with a
+  contextual options bar.
+- On-canvas selections with marching-ants feedback that become regular mask
+  layers: combine with Shift (add), Alt (subtract), and Shift+Alt (intersect),
+  deselect with Ctrl+D, invert with Ctrl+Shift+I, and refine any selection
+  with the add/subtract brushes, feathering, and range intersections.
 - A non-destructive stack of up to eight independent subject, object, people,
-  background, sky, brush, linear-gradient, radial-gradient, and range masks.
+  background, sky, brush, linear-gradient, radial-gradient, range, and
+  geometry-selection masks.
   Layers can be reordered,
   renamed, hidden, inverted, duplicated, refined with add/subtract brushes,
   and blended with per-mask opacity.
+- An interactive crop tool with drag handles, aspect presets and lock,
+  drag-to-straighten, cycling guide overlays, and preset crop shapes (oval,
+  star, heart, polygons, arrow, or the outline of the active selection) with
+  feathered edges. While cropping, drag the photo to reposition it under the
+  crop, drag its corners to zoom, and drag its edges to stretch — all
+  non-destructive and revertable. Shape crops export with transparency on
+  PNG/WebP/TIFF and flatten to white on JPEG.
 - Local exposure, color, clarity, blur, dodge, and burn controls plus bounded
   spot healing, clone sampling, and red-eye correction. Optional object and
   people models run locally after explicit approval; sky selection is a
@@ -35,7 +53,7 @@ Project website and user guide: <https://lumadarkroom.com>
   control. Custom presets autosave locally and can be renamed, deleted, or
   moved between computers with validated JSON export/import.
 - Before/original comparison, two-photo comparison, a filmstrip, zoom, rotate,
-  flip, crop/aspect controls, and edit history.
+  flip, and edit history.
 - JPEG, PNG, WebP, and TIFF export, original-file copy, size and quality
   controls, and optional text watermarks.
 - JPEG, PNG, WebP, BMP, GIF, TIFF, and AVIF import. Camera-RAW and HEIC import
@@ -55,17 +73,35 @@ Project website and user guide: <https://lumadarkroom.com>
 
 Shortcuts are ignored while typing in a field or while a dialog is open.
 
+In the Develop view, single letters select editing tools; culling letters
+(P/X/U for flags) still work from the Library view.
+
 | Action | Shortcut |
 | --- | --- |
+| Move / Transform tool | V |
+| Marquee select (Shift cycles rect → ellipse → shape) | M / Shift + M |
+| Lasso select (Shift cycles freehand → polygonal) | L / Shift + L |
+| Auto select (magic wand) | W |
+| Pen (vector selection) | P |
+| Crop and shape crop | C |
+| Gradient mask (Shift cycles linear → radial) | G / Shift + G |
+| Color sampler / Heal | I / J |
+| Zoom tool / Hand tool | Z / H |
+| Add / subtract / intersect while drawing a selection | Shift / Alt / Shift + Alt |
+| Constrain square (during marquee drag) / draw from center | Shift / Alt |
+| Close a polygon or pen path / remove last point | Enter or double-click / Backspace |
+| Deselect / invert the active mask | Ctrl + D / Ctrl + Shift + I |
+| Select all | Ctrl + A |
+| Crop: apply / cancel / cycle guides / swap aspect | Enter / Esc / O / X |
 | Previous / next photograph | Left / Right |
 | Set rating | 1–5 |
 | Clear rating | 0 |
-| Pick / reject / unflag | P / X / U |
-| Library / Develop | G / D |
+| Pick / reject / unflag (Library view) | P / X / U |
+| Library / Develop | G (Library) / D |
 | Hold original | Backslash |
 | Undo / redo | Ctrl or Cmd + Z / Shift + Ctrl or Cmd + Z |
 | Open export | Ctrl or Cmd + E |
-| Open Help Center | F1 |
+| Open Help Center | F1 or ? |
 | Move the active canvas tool cursor | Arrow keys; hold Shift for larger steps |
 | Apply the active canvas tool | Enter |
 | Decrease / increase brush or repair size | [ / ] |
@@ -107,6 +143,8 @@ not code-signed. See [Releasing](docs/RELEASING.md) before distributing a build.
 | **electron/custom-presets.js** | Strict custom-preset file schema, bounds, validation, and canonical serialization |
 | **electron/preload.js** | Narrow context-bridge API exposed to the renderer |
 | **src/app.js** | Catalog, UI, culling workflow, autosave, presets, and renderer orchestration |
+| **src/tools.js** | Tool rail, options bar, on-canvas selection tools (marquee, lasso, wand, pen), Move/Transform, and overlay rendering |
+| **src/crop-tool.js** | Interactive crop mode: handles, aspect lock, guides, shape crops, and photo transform under the crop |
 | **src/engine.js** | Edit schema, migration, geometry, pixel processing, analysis, and canvas export |
 | **src/preview-worker.js** | Coalesced background preview rendering with watchdog recovery |
 | **src/render-worker.js** | Background full-size render, encoding, progress, and cancellation |

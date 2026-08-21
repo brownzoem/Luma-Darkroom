@@ -201,8 +201,8 @@ async function livePage(app) {
       inputUnchanged: frozenV5 === JSON.stringify(v5),
       pixels: migrationPixels,
     };
-    if (migration.version !== 7 || migration.rangeType !== 'none' || migration.semantic !== null || migration.exposure !== 0.25 || migration.subjectExposure !== 0.4 || !migration.inputUnchanged || migrationPixels.maximum !== 0) {
-      failures.push(`v5-to-v7 migration changed legacy state or pixels: ${JSON.stringify(migration)}`);
+    if (migration.version !== E.EDIT_SCHEMA_VERSION || migration.rangeType !== 'none' || migration.semantic !== null || migration.exposure !== 0.25 || migration.subjectExposure !== 0.4 || !migration.inputUnchanged || migrationPixels.maximum !== 0) {
+      failures.push(`v5-to-current migration changed legacy state or pixels: ${JSON.stringify(migration)}`);
     }
 
     const workerRender = async workerEdits => {

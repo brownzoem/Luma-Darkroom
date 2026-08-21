@@ -1,5 +1,5 @@
 {
-  "release": "2.4.0",
+  "release": "3.0.0",
   "platformPayload": "@img/sharp-win32-x64@0.35.3",
   "nativeInventory": "third_party/SHARP-WIN32-X64-VERSIONS.json",
   "sources": [

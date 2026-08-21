@@ -418,10 +418,11 @@ async function livePage(app, rendererErrors) {
   }));
 
   const ui = { uiSetup, uiBefore, samplingStability, ninthGuard, afterDelete, afterUndo, persistenceWrite, afterRestart };
+  const schemaVersion = await page.evaluate(() => LumaEngine.EDIT_SCHEMA_VERSION);
   const failures = [];
   if (engine.legacy.maximumDelta > 1 || engine.legacy.neutralMaximumDelta !== 0 || !engine.legacy.inputUnchanged || engine.legacy.mode !== 'hue-v1') failures.push('v6 Point Color migration or frozen renderer parity failed');
   const hostile = engine.hostile;
-  if (hostile.version !== 7 || hostile.count !== 8 || hostile.uniqueIds !== 8 || !hostile.safeIds || !hostile.validModes || !hostile.allFinite || !hostile.bounded || !hostile.activeValid || !hostile.prototypeClean || Object.values(hostile.calibration).some(value => !Number.isFinite(value) || value < -100 || value > 100)) failures.push('Hostile Point Color or calibration input escaped schema bounds');
+  if (hostile.version !== schemaVersion || hostile.count !== 8 || hostile.uniqueIds !== 8 || !hostile.safeIds || !hostile.validModes || !hostile.allFinite || !hostile.bounded || !hostile.activeValid || !hostile.prototypeClean || Object.values(hostile.calibration).some(value => !Number.isFinite(value) || value < -100 || value > 100)) failures.push('Hostile Point Color or calibration input escaped schema bounds');
   if (!(engine.hueWrap.selectedDelta > 20 && engine.hueWrap.distantDelta <= 1)) failures.push('Point Color hue selection did not wrap cleanly across 0/360 degrees');
   if (!(engine.rangeExclusion[0] > 20 && engine.rangeExclusion[1] <= 1 && engine.rangeExclusion[2] <= 1)) failures.push('Point Color saturation or luminance range failed to exclude a same-hue mismatch');
   if (engine.overlap.maximumDelta > 1) failures.push(`Overlapping Point Color samples depend on array order (maximum delta ${engine.overlap.maximumDelta})`);
@@ -432,7 +433,7 @@ async function livePage(app, rendererErrors) {
   if (ui.uiSetup.count !== 8 || ui.uiSetup.history !== 0 || !ui.uiBefore.disabled || ui.uiBefore.countText !== '8 / 8' || ui.uiBefore.options !== 8 || ui.uiBefore.active !== 1 || !ui.uiBefore.namesValid || ui.ninthGuard.count !== 8 || ui.ninthGuard.toolAfter !== ui.uiBefore.toolBefore) failures.push('Eight-sample UI limit or accessible swatch state failed');
   if (ui.samplingStability.neutral.join(',') !== ui.samplingStability.shifted.join(',') || !ui.samplingStability.stateRestored) failures.push('Point Color sampling fed an active Point Color result back into its own target');
   if (ui.afterDelete.count !== 7 || ui.afterDelete.undo !== 1 || ui.afterDelete.redo !== 0 || ui.afterUndo.count !== 8 || ui.afterUndo.undo !== 0 || ui.afterUndo.redo !== 1 || ui.afterUndo.activeId !== 'ui-7') failures.push('Point Color delete was not one deterministic undo transaction');
-  if (!ui.persistenceWrite.saved || ui.persistenceWrite.compactVersion !== 7 || ui.persistenceWrite.compactCount !== 8 || ui.afterRestart.version !== 7 || ui.afterRestart.count !== 8 || ui.afterRestart.activeId !== 'ui-7' || ui.afterRestart.redPrimaryHue !== 27 || ui.afterRestart.shadowTint !== -14 || !ui.afterRestart.addDisabled) failures.push('Point Color or calibration state failed compact save/process restart round-trip');
+  if (!ui.persistenceWrite.saved || ui.persistenceWrite.compactVersion !== schemaVersion || ui.persistenceWrite.compactCount !== 8 || ui.afterRestart.version !== schemaVersion || ui.afterRestart.count !== 8 || ui.afterRestart.activeId !== 'ui-7' || ui.afterRestart.redPrimaryHue !== 27 || ui.afterRestart.shadowTint !== -14 || !ui.afterRestart.addDisabled) failures.push('Point Color or calibration state failed compact save/process restart round-trip');
   if (rendererErrors.length) failures.push('Renderer emitted unexpected errors');
 
   process.stdout.write(`${JSON.stringify({ engine, ui, rendererErrors, failures }, null, 2)}\n`);

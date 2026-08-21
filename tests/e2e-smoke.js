@@ -90,6 +90,7 @@ async function launch(){
 
   // Local brush and cleanup interactions (no optional model download required).
   await page.click('.panel-tabs [data-panel="mask"]');
+  await page.click('#addMaskMenuBtn');
   await page.click('#addBrushMask');
   const canvasBox=await page.locator('#canvas').boundingBox();
   await page.mouse.click(canvasBox.x+canvasBox.width*.42,canvasBox.y+canvasBox.height*.43);

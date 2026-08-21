@@ -465,6 +465,7 @@ async function previewExportParity(page) {
   await waitForPreview(page);
   await page.click('#maskPanelTab');
 
+  await page.click('#addMaskMenuBtn');
   await page.click('#addLinearMask');
   const linearArmed = await page.evaluate(() => toolMode === 'mask-linear');
   await dragAcrossCanvas(page, [0.18, 0.34], [0.82, 0.67]);
@@ -479,14 +480,17 @@ async function previewExportParity(page) {
     };
   });
 
+  await page.click('#addMaskMenuBtn');
   await page.click('#addRadialMask');
   const radialArmed = await page.evaluate(() => toolMode === 'mask-radial');
   await dragAcrossCanvas(page, [0.48, 0.46], [0.72, 0.64]);
   const radialUi = await page.evaluate(() => ({ type: activeMask().type, distance: Math.hypot(activeMask().x2 - activeMask().x, activeMask().y2 - activeMask().y), guideVisible: !gradientGuide.classList.contains('hidden') }));
 
+  await page.click('#addMaskMenuBtn');
   await page.click('#addDodgeMask');
   const dodgeArmed = await page.evaluate(() => toolMode === 'mask-add');
   await dragAcrossCanvas(page, [0.28, 0.46], [0.38, 0.54]);
+  await page.click('#addMaskMenuBtn');
   await page.click('#addBurnMask');
   const burnArmed = await page.evaluate(() => toolMode === 'mask-add');
   if (burnArmed) await dragAcrossCanvas(page, [0.65, 0.43], [0.76, 0.56]);
@@ -509,14 +513,18 @@ async function previewExportParity(page) {
   await page.locator('#maskList .mask-row').first().locator('.mask-eye').click();
   await waitForPreview(page);
   const beforeOrder = await page.evaluate(() => current.edits.masks.layers.map(layer => layer.id));
+  // v3.1: reorder lives in the per-row ⋯ menu.
+  await page.locator('#maskList .mask-row.active .mask-row-more').click();
   await page.click('#maskMoveDown');
   const afterOrder = await page.evaluate(() => current.edits.masks.layers.map(layer => layer.id));
   await page.click('#undoBtn');
   const orderAfterUndo = await page.evaluate(() => current.edits.masks.layers.map(layer => layer.id));
   await page.click('#redoBtn');
   const orderAfterRedo = await page.evaluate(() => current.edits.masks.layers.map(layer => layer.id));
+  // v3.1: rename is inline — double-click the row, type, Enter commits.
+  await page.locator('#maskList .mask-row.active').dblclick();
   await page.fill('#maskName', 'Burn shadows');
-  await page.locator('#maskName').dispatchEvent('change');
+  await page.keyboard.press('Enter');
   const stackAfter = await page.evaluate(() => ({
     order: current.edits.masks.layers.map(layer => layer.name),
     active: activeMask().name,

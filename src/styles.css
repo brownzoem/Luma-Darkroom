@@ -158,3 +158,38 @@ dialog:not(.tutorial-dialog){max-height:calc(100vh - 28px);overflow:auto}dialog 
 .tool-rail{scrollbar-width:none}
 .tool-rail::-webkit-scrollbar{display:none}
 .tool-rail-btn{max-width:100%}
+
+/* ============================================================================
+   Masks 2.0 panel: add-mask dropdown, thumbnail rows, row menu, drag reorder
+   ============================================================================ */
+.mask-create-bar{position:relative;margin-bottom:8px}
+.add-mask-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:var(--panel2);border:1px solid var(--line);border-radius:9px;box-shadow:0 14px 40px #000a;padding:5px;max-height:340px;overflow-y:auto}
+.add-mask-menu button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:transparent;border:0;border-radius:6px;padding:7px 9px;cursor:pointer;color:var(--text)}
+.add-mask-menu button:hover,.add-mask-menu button:focus-visible{background:var(--panel3)}
+.add-mask-menu button b{font-size:12.5px;font-weight:600}
+.add-mask-menu button span{font-size:11px;color:var(--muted)}
+
+.mask-row{display:flex;align-items:center;gap:8px;position:relative}
+.mask-thumb{width:38px;height:28px;flex:0 0 auto;padding:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;cursor:pointer;position:relative;display:grid;place-items:center;background:repeating-conic-gradient(#191c1f 0% 25%,#23272b 0% 50%) 0 0/8px 8px}
+.mask-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.mask-row.active .mask-thumb{border-color:var(--accent)}
+.mask-thumb.viewing{outline:2px solid var(--accent);outline-offset:1px}
+.mask-thumb.disabled img{opacity:.4}
+.mask-thumb.disabled::after{content:'×';position:absolute;inset:0;display:grid;place-items:center;color:var(--danger);font:700 19px/1 "Segoe UI",sans-serif;text-shadow:0 0 4px #000}
+.mask-row-label{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;flex:1 1 auto;line-height:1.15;cursor:default}
+.mask-row-name{font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mask-row-type{font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.mask-rename{width:100%;background:var(--panel3);border:1px solid var(--accent);border-radius:5px;color:var(--text);font-size:12.5px;padding:2px 6px}
+.mask-row-more{flex:0 0 auto;width:24px;height:24px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:15px;line-height:1;cursor:pointer;opacity:0;transition:opacity .12s}
+.mask-row:hover .mask-row-more,.mask-row:focus-within .mask-row-more,.mask-row.active .mask-row-more{opacity:1}
+.mask-row-more:hover{background:var(--panel3);color:var(--text)}
+.mask-row-menu{position:fixed;z-index:120;min-width:168px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;box-shadow:0 16px 44px #000c;padding:5px}
+.mask-row-menu button{display:block;width:100%;text-align:left;background:transparent;border:0;border-radius:6px;padding:6px 10px;font-size:12.5px;color:var(--text);cursor:pointer}
+.mask-row-menu button:hover:not([disabled]),.mask-row-menu button:focus-visible{background:var(--panel3)}
+.mask-row-menu button[disabled]{opacity:.4;cursor:default}
+.mask-row-menu button.danger-quiet{color:var(--danger)}
+.mask-list.reordering{cursor:grabbing}
+.mask-list.reordering .mask-row{cursor:grabbing}
+.mask-row.dragging{opacity:.45}
+.mask-row.drop-before::before{content:'';position:absolute;left:2px;right:2px;top:-2px;height:2.5px;border-radius:2px;background:var(--accent)}
+.mask-row.drop-after::after{content:'';position:absolute;left:2px;right:2px;bottom:-2px;height:2.5px;border-radius:2px;background:var(--accent)}

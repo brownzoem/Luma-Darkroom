@@ -50,6 +50,7 @@ async function waitForPreview(page) {
   await waitForPreview(page);
 
   await page.click('[data-panel="mask"]');
+  await page.click('#addMaskMenuBtn');
   await page.click('#addBrushMask');
   await page.waitForFunction(() => document.activeElement === canvas);
   const toolAutoFocused = await page.evaluate(() => document.activeElement === canvas);
@@ -70,6 +71,7 @@ async function waitForPreview(page) {
   await page.keyboard.press('Enter');
   const brushState = await page.evaluate(() => ({ count: activeMask().strokes.length, stroke: E.clone(activeMask().strokes.at(-1)), history: historyStacks()[0].at(-1)?.label }));
 
+  await page.click('#addMaskMenuBtn');
   await page.click('#addLinearMask');
   await page.locator('#canvas').focus();
   await page.keyboard.press('Enter');

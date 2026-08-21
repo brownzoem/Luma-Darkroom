@@ -183,10 +183,11 @@ const check = (condition, message, detail) => {
   });
   check(flipRoundTrip, 'flip twice restores region coordinates');
 
-  // Mask layer cap and degenerate gestures.
+  // Mask layer cap (layers now come only from the explicit ＋ action) and degenerate gestures.
   const limit = await page.evaluate(() => {
-    while (current.edits.masks.layers.length < 8) LumaToolRail.commitRegion({ kind: 'shape', shape: 'rect', cx: 0.5, cy: 0.5, w: 0.2, h: 0.2, rotation: 0, roundness: 0 }, 'new', 'Fill layer');
-    const accepted = LumaToolRail.commitRegion({ kind: 'shape', shape: 'rect', cx: 0.5, cy: 0.5, w: 0.2, h: 0.2, rotation: 0, roundness: 0 }, 'new', 'Overflow layer');
+    let guard = 0;
+    while (current.edits.masks.layers.length < 8 && guard++ < 12) LumaToolRail.addSelectionLayer();
+    const accepted = !!LumaToolRail.addSelectionLayer();
     return { layers: current.edits.masks.layers.length, accepted };
   });
   check(limit.layers === 8 && limit.accepted === false, 'ninth mask layer rejected', limit);

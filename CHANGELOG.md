@@ -5,6 +5,25 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+## 3.2.0 - 2026-08-21
+
+### Added
+
+- Batch export: select photographs in the Library, open Export, and choose
+  "Selected photographs" — every photo renders in the background with the
+  chosen format, size, quality, and watermark, written into one approved
+  folder with automatic name uniquing, per-file progress, cancellation, and
+  a per-file failure summary. No dialog per file.
+- A live RGB readout in the canvas toolbar shows the values under the
+  cursor while editing.
+- The Zoom tool gains scrubby zoom: drag left or right to zoom smoothly
+  around the point you pressed.
+
+### Changed
+
+- The export dialog explains the batch scope and disables "Original file"
+  for batch runs (batch always renders edits).
+
 ## 3.1.1 - 2026-08-21
 
 ### Fixed

@@ -20,6 +20,8 @@ const customPresets = Object.freeze({
 contextBridge.exposeInMainWorld('desktop', {
   pickImages: () => ipcRenderer.invoke('pick-images'),
   exportImage: payload => ipcRenderer.invoke('export-image', payload),
+  pickExportDirectory: () => ipcRenderer.invoke('pick-export-directory'),
+  exportImageInto: payload => ipcRenderer.invoke('export-image-into', payload),
   revealFile: filePath => ipcRenderer.invoke('reveal-file', filePath),
   pathForFile: file => webUtils.getPathForFile(file),
   saveCatalog: text => ipcRenderer.invoke('save-catalog', text),

@@ -28,11 +28,14 @@ async function livePage(app) {
   return page;
 }
 
+const batchDirectory = path.join(userData, 'batch-out');
+fs.mkdirSync(batchDirectory, { recursive: true });
+
 (async () => {
-  fixtures = await createPhotoFixtures(1);
-  const [sample] = fixtures.paths;
+  fixtures = await createPhotoFixtures(2);
+  const [sample, second] = fixtures.paths;
   const errors = [];
-  runningApp = await electron.launch({ args: launchArgs, cwd: runtimeCwd });
+  runningApp = await electron.launch({ args: launchArgs, cwd: runtimeCwd, env: { ...process.env, LUMA_ALLOW_EXPORT_DIR: batchDirectory } });
   const page = await livePage(runningApp);
   page.on('pageerror', error => errors.push(`PAGE: ${error.stack || error}`));
   page.on('console', message => {
@@ -43,12 +46,14 @@ async function livePage(app) {
     await page.click('#tutorialSkip');
     await page.locator('#tutorialDialog').waitFor({ state: 'hidden' });
   }
-  await page.evaluate(filePath => {
+  await page.evaluate(([filePath, secondPath]) => {
     const photo = E.migratePhoto({ id: 'worker-selected', filePath, name: 'worker-selected.jpg', importedAt: Date.now() });
-    photos = [photo];
+    const other = E.migratePhoto({ id: 'worker-second', filePath: secondPath, name: 'worker-second.jpg', importedAt: Date.now() - 1000 });
+    other.edits.light.exposure = 0.4;
+    photos = [photo, other];
     updateLibrary();
     selectPhoto(photo);
-  }, sample);
+  }, [sample, second]);
   await page.waitForFunction(() => current?.id === 'worker-selected' && sourceImage.naturalWidth === 1600 && canvas.width > 500, null, { timeout: 30000 });
 
   const render = await page.evaluate(async () => {
@@ -136,8 +141,30 @@ async function livePage(app) {
     return { workerWasActive, outcome, elapsed: Math.round(performance.now() - started), workerReleased: activeExportWorker === null };
   });
 
+  // Batch export: two selected photographs render into one approved folder,
+  // no per-file dialogs; a second run uniquifies names instead of overwriting.
+  const batch = await page.evaluate(async directory => {
+    photos.forEach(photo => { photo.selected = true; });
+    $('#exportBtn').click();
+    await new Promise(resolve => setTimeout(resolve, 120));
+    $('#exportScope').value = 'selected';
+    $('#exportFormat').value = 'jpg';
+    updateExportOptions();
+    const scopeVisible = !$('#exportScopeField').classList.contains('hidden');
+    const originalDisabled = $('#exportFormat').querySelector('option[value="original"]').disabled;
+    const first = await doBatchExport({ directory });
+    const second = await doBatchExport({ directory });
+    $('#exportDialog').open && $('#exportDialog').close();
+    return { scopeVisible, originalDisabled, first, second };
+  }, batchDirectory);
+  const batchFiles = fs.readdirSync(batchDirectory).sort();
+  const batchSizes = batchFiles.map(name => fs.statSync(path.join(batchDirectory, name)).size);
+
   const failures = [];
   if (render.selectedId !== 'worker-selected') failures.push('Worker did not render the selected photograph');
+  if (!batch.scopeVisible || !batch.originalDisabled) failures.push('Batch export scope UI did not activate for a multi-selection');
+  if (batch.first?.written !== 2 || batch.first?.failed !== 0 || batch.second?.written !== 2) failures.push(`Batch export did not write both selected photographs twice: ${JSON.stringify({ first: batch.first, second: batch.second })}`);
+  if (batchFiles.length !== 4 || new Set(batchFiles).size !== 4 || !batchFiles.some(name => / \(2\)\.jpg$/.test(name)) || batchSizes.some(size => size < 10_000)) failures.push(`Batch output files are wrong: ${JSON.stringify({ batchFiles, batchSizes })}`);
   if (render.mime !== 'image/jpeg' || render.byteLength < 10_000 || render.signature.join(',') !== '255,216,255' || render.ending.join(',') !== '255,217') failures.push('Worker did not produce a valid JPEG payload');
   if (render.workerSize.join(',') !== '1500,1500' || render.decodedSize.join(',') !== '1500,1500') failures.push('Worker crop dimensions or encoded dimensions are wrong');
   if (render.ticks < 5 || render.frames < 2) failures.push('Renderer event loop did not remain responsive during export');
@@ -145,7 +172,7 @@ async function livePage(app) {
   if (!cancellation.workerWasActive || cancellation.outcome.state !== 'rejected' || cancellation.outcome.name !== 'AbortError' || cancellation.elapsed > 1500 || !cancellation.workerReleased) failures.push('Active Worker cancellation did not settle promptly');
   if (errors.length) failures.push('Renderer emitted unexpected errors');
 
-  const report = { render, cancellation, errors, failures };
+  const report = { render, cancellation, batch: { ...batch, batchFiles, batchSizes }, errors, failures };
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   await runningApp.close();
   await fixtures.cleanup();

@@ -288,7 +288,7 @@
     const count=width*height,alpha=new Uint8ClampedArray(count);
     const seedX=Math.max(0,Math.min(width-1,Math.round(region.x*(width-1)))),seedY=Math.max(0,Math.min(height-1,Math.round(region.y*(height-1)))),seed=seedY*width+seedX;
     const seedOffset=seed*4,seedR=source[seedOffset],seedG=source[seedOffset+1],seedB=source[seedOffset+2];
-    const tolerance=.02+region.tolerance/100*.55,soft=Math.max(.012,tolerance*.3),hard=Math.max(0,tolerance-soft);
+    const tolerance=.015+region.tolerance/100*.42,soft=Math.max(.012,tolerance*.3),hard=Math.max(0,tolerance-soft);
     const weightFor=index=>{const offset=index*4,dr=(source[offset]-seedR)/255,dg=(source[offset+1]-seedG)/255,db=(source[offset+2]-seedB)/255,distance=Math.sqrt(dr*dr*.3+dg*dg*.5+db*db*.2);return 1-smooth(clamp((distance-hard)/soft))};
     if(region.contiguous===false){for(let index=0;index<count;index++)alpha[index]=weightFor(index)*255;return alpha}
     const queue=new Int32Array(count),visited=new Uint8Array(count);let head=0,tail=0;visited[seed]=1;queue[tail++]=seed;
@@ -312,7 +312,7 @@
     return 1;
   }
 
-  function buildMaskWeights(canvas,m){
+  function buildMaskWeights(canvas,m,e){
     if(!m?.enabled)return null;const width=canvas.width,height=canvas.height,maxAnalysisEdge=512,semanticEdge=Math.min(1024,Math.max(width,height)),semanticScale=m.semantic?Math.min(1,semanticEdge/Math.max(m.semantic.width,m.semantic.height)):1,smallWidth=m.semantic?Math.max(1,Math.round(m.semantic.width*semanticScale)):Math.max(1,Math.round(width*Math.min(1,maxAnalysisEdge/Math.max(width,height)))),smallHeight=m.semantic?Math.max(1,Math.round(m.semantic.height*semanticScale)):Math.max(1,Math.round(height*Math.min(1,maxAnalysisEdge/Math.max(width,height)))),semanticWeights=semanticMaskWeights(m.semantic,smallWidth,smallHeight),small=makeCanvas(smallWidth,smallHeight),smallContext=small.getContext('2d',{willReadFrequently:true});smallContext.imageSmoothingQuality='high';smallContext.drawImage(canvas,0,0,smallWidth,smallHeight);const mask=makeCanvas(smallWidth,smallHeight),maskContext=mask.getContext('2d',{willReadFrequently:true});
     if(semanticWeights){
       const image=maskContext.createImageData(smallWidth,smallHeight);for(let index=0;index<semanticWeights.length;index++){const offset=index*4;image.data[offset]=image.data[offset+1]=image.data[offset+2]=255;image.data[offset+3]=semanticWeights[index]}maskContext.putImageData(image,0,0);
@@ -336,7 +336,16 @@
       const image=maskContext.createImageData(smallWidth,smallHeight);for(let index=0;index<count;index++)if(selected[index]){const offset=index*4;image.data[offset]=image.data[offset+1]=image.data[offset+2]=image.data[offset+3]=255}maskContext.putImageData(image,0,0);
       if(m.feather>0){const softened=makeCanvas(smallWidth,smallHeight),softContext=softened.getContext('2d');softContext.filter=`blur(${.25+m.feather/100*3}px)`;softContext.drawImage(mask,0,0);maskContext.clearRect(0,0,smallWidth,smallHeight);maskContext.drawImage(softened,0,0)}
     }else if(m.type==='geometry'){
-      const regions=Array.isArray(m.regions)?m.regions:[],needsPixels=regions.some(region=>region.kind==='wand'),regionSource=needsPixels?smallContext.getImageData(0,0,smallWidth,smallHeight).data:null;
+      const regions=Array.isArray(m.regions)?m.regions:[],needsPixels=regions.some(region=>region.kind==='wand');
+      // The wand measures color similarity against the globally ADJUSTED image
+      // (what the user is looking at), not the raw decode — on an underexposed
+      // frame the raw pixels are all near-black and any tolerance floods.
+      // Legacy subject-flood and range sampling keep raw pixels for render parity.
+      let regionSource=null;
+      if(needsPixels){
+        if(e){const adjusted=makeCanvas(smallWidth,smallHeight),adjustedContext=adjusted.getContext('2d',{willReadFrequently:true});adjustedContext.drawImage(small,0,0);applyPixels(adjusted,e,[]);regionSource=adjustedContext.getImageData(0,0,smallWidth,smallHeight).data;adjusted.width=adjusted.height=1}
+        else regionSource=smallContext.getImageData(0,0,smallWidth,smallHeight).data;
+      }
       for(const region of regions){
         maskContext.save();
         maskContext.globalCompositeOperation=region.mode==='subtract'?'destination-out':region.mode==='intersect'?'destination-in':'source-over';
@@ -498,7 +507,7 @@
     if(maskOnly){
       const layer=e.masks.layers.find(candidate=>candidate.id===maskOnly);
       if(layer){
-        let map=buildMaskWeights(layer.space==='source'?oriented:canvas,{...layer,enabled:true});
+        let map=buildMaskWeights(layer.space==='source'?oriented:canvas,{...layer,enabled:true},e);
         if(map&&layer.space==='source')map=transformMaskMap(map,e);
         const context=canvas.getContext('2d',{willReadFrequently:true}),image2=context.createImageData(canvas.width,canvas.height);
         for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++){const value=Math.round(maskWeightAt(map,x,y,canvas.width,canvas.height)*255),offset=(y*canvas.width+x)*4;image2.data[offset]=image2.data[offset+1]=image2.data[offset+2]=value;image2.data[offset+3]=255}
@@ -508,7 +517,7 @@
       }
     }
     for(const layer of [...e.masks.layers].reverse()){
-      const overlay=visualizeMask&&active===layer&&layer.show;if(!layer.enabled&&!overlay)continue;if(!layerHasEffect(layer)&&!overlay)continue;let map=buildMaskWeights(layer.space==='source'?oriented:canvas,layer);if(map&&layer.space==='source'){const sourceMap=map;map=transformMaskMap(sourceMap,e);if(sourceMap.canvas&&sourceMap.canvas!==map.canvas)sourceMap.canvas.width=sourceMap.canvas.height=1}if(map){if(!layer.backgroundBlur&&!layer.localBlur&&map.canvas){map.canvas.width=map.canvas.height=1;map.canvas=null}entries.push({layer,map})}
+      const overlay=visualizeMask&&active===layer&&layer.show;if(!layer.enabled&&!overlay)continue;if(!layerHasEffect(layer)&&!overlay)continue;let map=buildMaskWeights(layer.space==='source'?oriented:canvas,layer,e);if(map&&layer.space==='source'){const sourceMap=map;map=transformMaskMap(sourceMap,e);if(sourceMap.canvas&&sourceMap.canvas!==map.canvas)sourceMap.canvas.width=sourceMap.canvas.height=1}if(map){if(!layer.backgroundBlur&&!layer.localBlur&&map.canvas){map.canvas.width=map.canvas.height=1;map.canvas=null}entries.push({layer,map})}
     }
     applyPixels(canvas,e,[]);applyDetail(canvas,e);
     const effectEntries=entries.filter(entry=>entry.layer.enabled&&layerHasEffect(entry.layer));let segment=[];
@@ -523,7 +532,7 @@
     const working=clone(layer);working.enabled=true;
     const buildEdge=Math.min(224,Math.max(96,maxEdge*4)),oriented=orientedSource(image,e,buildEdge);
     const base=working.space==='source'?oriented:transformAndCrop(oriented,e);
-    let map=buildMaskWeights(base,working);
+    let map=buildMaskWeights(base,working,e);
     if(!map)return null;
     if(working.space==='source')map=transformMaskMap(map,e);
     const scale=Math.min(1,maxEdge/Math.max(map.width,map.height)),outWidth=Math.max(1,Math.round(map.width*scale)),outHeight=Math.max(1,Math.round(map.height*scale));

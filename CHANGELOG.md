@@ -5,6 +5,18 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+## 3.1.1 - 2026-08-21
+
+### Fixed
+
+- The magic wand now measures color similarity against the globally adjusted
+  image — what is actually on screen — instead of the raw decode, so it no
+  longer floods underexposed photographs that have been lifted. Its
+  tolerance curve is also retuned to the range professionals expect from a
+  wand; existing wand selections re-rasterize slightly tighter. Discovered
+  while testing against real 20-megapixel dusk photographs; verified there
+  alongside the click-to-subject and people selections.
+
 ## 3.1.0 - 2026-08-21
 
 ### Added

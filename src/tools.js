@@ -53,6 +53,7 @@
     pending: null,                       // multi-click path in progress (polygonal lasso / pen)
     selectedAnchor: null,                // {regionIndex, pointIndex} for pen editing
     antsOffset: 0,
+    instructedTools: new Set(),          // tool hints toast once per session
     overlayPainters: [],                 // extra painters (crop tool registers here)
     keyHandlers: [],                     // extra key handlers (crop tool registers here)
     lastDraftAt: 0,
@@ -198,11 +199,23 @@
 
   function combineControl() {
     return segment('Selection combine mode', [
-      ['new', 'New', 'Each selection creates a new mask'],
+      ['new', 'New', 'Replaces the active selection (its adjustments stay)'],
       ['add', 'Add', 'Add to the active selection (Shift while drawing)'],
       ['subtract', 'Subtract', 'Remove from the active selection (Alt while drawing)'],
       ['intersect', 'Intersect', 'Keep only the overlap (Shift+Alt while drawing)']
     ], state.combine, value => { state.combine = value; });
+  }
+
+  /** ＋ button in the selection tools' options bar — the explicit "new layer" action. */
+  function newSelectionLayerButton() {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mini-btn';
+    button.id = 'newSelectionLayerBtn';
+    button.textContent = '＋ New layer';
+    button.title = 'Add a separate Selection mask layer (drawing alone never adds layers)';
+    button.onclick = () => addSelectionLayer();
+    return button;
   }
 
   const optionsProviders = new Map();
@@ -226,7 +239,7 @@
     bar.append(title);
 
     if (tool.id === 'marquee') {
-      bar.append(combineControl());
+      bar.append(combineControl(), newSelectionLayerButton());
       bar.append(segment('Marquee shape', [['rect', '▭ Rect'], ['ellipse', '◯ Ellipse'], ['shape', '★ Shape']], state.marqueeVariant, value => { state.marqueeVariant = value; }));
       if (state.marqueeVariant === 'shape') {
         bar.append(optionLabel('Shape'));
@@ -250,11 +263,11 @@
       }
       bar.append(hintSpan('Shift while dragging keeps it square · Alt draws from the center.'));
     } else if (tool.id === 'lasso') {
-      bar.append(combineControl());
+      bar.append(combineControl(), newSelectionLayerButton());
       bar.append(segment('Lasso mode', [['freehand', '∿ Freehand'], ['polygonal', '⟋ Polygonal']], state.lassoVariant, value => { state.lassoVariant = value; cancelPending(); }));
       bar.append(hintSpan(state.lassoVariant === 'freehand' ? 'Draw around the area; release to close.' : 'Click to place points · Enter or double-click closes · Backspace removes the last point.'));
     } else if (tool.id === 'wand') {
-      bar.append(combineControl());
+      bar.append(combineControl(), newSelectionLayerButton());
       bar.append(optionLabel('Tolerance'));
       const tolerance = document.createElement('input');
       tolerance.type = 'range'; tolerance.min = '0'; tolerance.max = '100'; tolerance.value = String(state.wandTolerance);
@@ -280,7 +293,7 @@
       aiObject.onclick = () => beginSmartObjectSelection('', { name: 'Object', type: 'object', kind: 'object' });
       bar.append(aiSubject, aiObject);
     } else if (tool.id === 'pen') {
-      bar.append(combineControl());
+      bar.append(combineControl(), newSelectionLayerButton());
       bar.append(hintSpan('Click = corner point · click-drag = curve · click the first point or Enter closes · with a closed path, drag anchors and handles to refine.'));
     } else if (tool.id === 'move') {
       const reset = document.createElement('button');
@@ -396,31 +409,60 @@
   }
 
   /**
-   * Append a region to the active geometry mask (or create a new one) inside a
-   * single undo step, then reveal the mask panel.
+   * Route a drawn region into the active selection mask.
+   *
+   * Standard pro-editor semantics: with combine "new" the drawn shape
+   * REPLACES the active selection's regions (its adjustments, feather, and
+   * brush refinements stay); add/subtract/intersect append with that mode.
+   * Drawing never creates additional mask layers — the only bootstrap case
+   * is the very first selection when no selection mask is active. New layers
+   * come from the explicit ＋ controls (see addSelectionLayer).
    */
   function commitRegion(region, combine, label) {
     if (!current) return false;
     const active = activeMask();
-    const useExisting = combine !== 'new' && active?.type === 'geometry';
-    if (!useExisting && current.edits.masks.layers.length >= MAX_MASK_LAYERS) {
+    const activeGeometry = active?.type === 'geometry' ? active : null;
+    if (!activeGeometry && current.edits.masks.layers.length >= MAX_MASK_LAYERS) {
       toast('A photo can have up to ' + MAX_MASK_LAYERS + ' local masks');
       return false;
     }
+    const replacing = combine === 'new' && !!activeGeometry && (activeGeometry.regions || []).length > 0;
     const mode = combine === 'subtract' ? 'subtract' : combine === 'intersect' ? 'intersect' : 'add';
-    commit(label, () => {
-      let layer = useExisting ? activeMask() : null;
+    commit(replacing ? 'New selection' : label, () => {
+      let layer = activeGeometry ? activeMask() : null;
       if (!layer) {
         const id = uid();
-        layer = E.defaultMaskLayer({ id, name: uniqueMaskName(label), type: 'geometry', space: 'source', show: true, feather: 0 });
+        layer = E.defaultMaskLayer({ id, name: uniqueMaskName('Selection'), type: 'geometry', space: 'source', show: true, feather: 0 });
         current.edits.masks.layers.unshift(layer);
         current.edits.masks.activeId = id;
       }
       layer.enabled = true;
-      layer.regions = [...(layer.regions || []), { ...region, mode }];
+      layer.regions = replacing ? [{ ...region, mode: 'add' }] : [...(layer.regions || []), { ...region, mode }];
     });
     switchRightPanel('mask');
     return true;
+  }
+
+  /**
+   * Explicitly add a fresh, empty Selection mask layer (the ＋ actions).
+   * Keeps the current selection tool active, or arms the lasso.
+   */
+  function addSelectionLayer() {
+    if (!current) return null;
+    if (current.edits.masks.layers.length >= MAX_MASK_LAYERS) {
+      toast('A photo can have up to ' + MAX_MASK_LAYERS + ' local masks');
+      return null;
+    }
+    const id = uid();
+    commit('Add selection layer', () => {
+      const layer = E.defaultMaskLayer({ id, name: uniqueMaskName('Selection'), type: 'geometry', space: 'source', show: true, feather: 0 });
+      current.edits.masks.layers.unshift(layer);
+      current.edits.masks.activeId = id;
+    }, { render: false });
+    switchRightPanel('mask');
+    if (!['tool-marquee', 'tool-lasso', 'tool-wand', 'tool-pen'].includes(toolMode)) setTool('tool-lasso', { force: true });
+    toast('New selection layer · draw on the photo to shape it');
+    return activeMask();
   }
 
   function activeGeometryMask() {
@@ -585,10 +627,13 @@
     if (!gesture || event.pointerId !== gesture.pointerId) return;
     state.gesture = null;
     $wrap().classList.remove('panning');
-    if (gesture.kind === 'transform' && gesture.before && current?.id === gesture.photoId) {
-      current.edits = gesture.before;
-      refreshControls();
-      scheduleRender();
+    if (gesture.kind === 'transform') {
+      endCanvasWarp(gesture);
+      if (gesture.before && current?.id === gesture.photoId) {
+        current.edits = gesture.before;
+        refreshControls();
+        scheduleRender();
+      }
     }
     if (gesture.kind === 'crop') routeCrop('pointercancel', event);
   }
@@ -816,6 +861,38 @@
       startXOffset: geometry.xOffset, startYOffset: geometry.yOffset,
       axisX: normalizedAxis(matrix, 1, 0), axisY: normalizedAxis(matrix, 0, 1), moved: false
     };
+    beginCanvasWarp(state.gesture);
+  }
+
+  /** 60fps geometry-drag preview: redraw the snapshot under the delta transform. */
+  function drawTransformWarp(gesture) {
+    const canvas = $canvas();
+    if (!canvas) return;
+    const geometry = current.edits.geometry;
+    const scaleToBacking = canvas.width / gesture.rect.width;
+    const centerX = gesture.center.x * scaleToBacking, centerY = gesture.center.y * scaleToBacking;
+    const painted = drawCanvasWarp(gesture, context => {
+      if (gesture.part === 'pan') {
+        const dx = (geometry.xOffset - gesture.startXOffset) / 200 * gesture.dims.width * (canvas.width / gesture.metrics.cw);
+        const dy = (geometry.yOffset - gesture.startYOffset) / 200 * gesture.dims.height * (canvas.height / gesture.metrics.ch);
+        context.translate(dx, dy);
+      } else if (gesture.part === 'scale') {
+        const ratio = geometry.scale / gesture.startScale;
+        context.translate(centerX, centerY);
+        context.scale(ratio, ratio);
+        context.translate(-centerX, -centerY);
+      } else {
+        const axis = gesture.part === 'stretch-x' ? gesture.axisX : gesture.axisY;
+        const ratio = gesture.part === 'stretch-x' ? geometry.stretchX / gesture.startStretchX : geometry.stretchY / gesture.startStretchY;
+        const angle = Math.atan2(axis.y, axis.x);
+        context.translate(centerX, centerY);
+        context.rotate(angle);
+        context.scale(ratio, 1);
+        context.rotate(-angle);
+        context.translate(-centerX, -centerY);
+      }
+    });
+    if (!painted) requestDraft();
   }
 
   function normalizedAxis(matrix, dx, dy) {
@@ -850,13 +927,14 @@
       else geometry.stretchY = clampRange(gesture.startStretchY * ratio, 25, 400);
     }
     catalogDirty = true;
-    requestDraft();
+    drawTransformWarp(gesture);
   }
 
   function clampRange(value, min, max) { return Math.max(min, Math.min(max, value)); }
 
   function finishTransformGesture(gesture) {
     cancelPendingDraft();
+    endCanvasWarp(gesture);
     if (!gesture.moved || current?.id !== gesture.photoId) { scheduleRender(); return; }
     clearPresetTracking();
     current.edits = E.migratedEdits(current.edits);
@@ -922,6 +1000,65 @@
     return null;
   }
 
+  /**
+   * Marching-ants Path2D cache. Building screen paths for large lasso
+   * polygons every animation frame is the main overlay cost, so paths are
+   * cached against the regions array identity (sanitization replaces the
+   * array on every edit) plus the current screen matrix.
+   */
+  const antsCache = new WeakMap();
+  function antsPathsFor(regions, matrix, dims, displayWidth, displayHeight) {
+    const key = [displayWidth, displayHeight, matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f]
+      .map(value => Math.round(value * 100) / 100).join(',');
+    const cached = antsCache.get(regions);
+    if (cached && cached.key === key) return cached;
+    const entry = { key, paths: [], seeds: [] };
+    for (const region of regions) {
+      if (region.kind === 'wand') {
+        const seed = matrix.transformPoint(new DOMPoint(region.x, region.y));
+        entry.seeds.push({ x: seed.x, y: seed.y });
+        continue;
+      }
+      const path = regionScreenPath(region, matrix, dims);
+      if (path) entry.paths.push(path);
+    }
+    antsCache.set(regions, entry);
+    return entry;
+  }
+
+  /**
+   * Live canvas-warp preview for geometry drags: instead of re-rendering the
+   * pipeline on every pointer move, snapshot the current preview once and
+   * redraw it under a 2D transform, then do one real render on release.
+   */
+  function beginCanvasWarp(holder) {
+    const canvas = $canvas();
+    if (!canvas) return;
+    holder.warp = { bitmap: null, width: canvas.width, height: canvas.height };
+    createImageBitmap(canvas).then(bitmap => {
+      if (holder.warp && !holder.warp.bitmap && holder.warp.width === canvas.width) holder.warp.bitmap = bitmap;
+      else bitmap.close();
+    }).catch(() => {});
+  }
+  function drawCanvasWarp(holder, applyTransform) {
+    const canvas = $canvas(), warp = holder.warp;
+    if (!canvas || !warp || !warp.bitmap || canvas.width !== warp.width || canvas.height !== warp.height) return false;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    context.save();
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    applyTransform(context, canvas);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(warp.bitmap, 0, 0);
+    context.restore();
+    return true;
+  }
+  function endCanvasWarp(holder) {
+    holder.warp?.bitmap?.close?.();
+    if (holder.warp) holder.warp.bitmap = null;
+  }
+
   function strokeAnts(context, path) {
     context.save();
     context.lineWidth = 1.25;
@@ -972,19 +1109,12 @@
     const matrix = screenFromSourceMatrix(prepared, rect.width, rect.height);
     const dims = orientedDims(prepared);
 
-    // Marching ants around the active geometry selection.
+    // Marching ants around the active geometry selection (paths cached).
     const geometryMask = activeGeometryMask();
     if (geometryMask && geometryMask.regions?.length) {
-      for (const region of geometryMask.regions) {
-        if (region.kind === 'wand') {
-          const seed = matrix.transformPoint(new DOMPoint(region.x, region.y));
-          drawHandle(context, seed.x, seed.y, { round: true, active: true });
-          drewSomething = true;
-          continue;
-        }
-        const path = regionScreenPath(region, matrix, dims);
-        if (path) { strokeAnts(context, path); drewSomething = true; }
-      }
+      const ants = antsPathsFor(geometryMask.regions, matrix, dims, rect.width, rect.height);
+      for (const seed of ants.seeds) { drawHandle(context, seed.x, seed.y, { round: true, active: true }); drewSomething = true; }
+      for (const path of ants.paths) { strokeAnts(context, path); drewSomething = true; }
     }
 
     // Pen anchors + handles.
@@ -1088,10 +1218,16 @@
     if (first) drawHandle(context, first.sx ?? first.a?.x, first.sy ?? first.a?.y, { round: true, active: true });
   }
 
+  let overlayFrameToggle = false;
   function overlayLoop() {
-    state.antsOffset = (state.antsOffset + OVERLAY_STYLE.antsSpeed) % 18;
-    try { paintOverlay(); }
-    catch (error) { console.warn('[Luma] Tool overlay paint failed', error); }
+    // Idle ants animate at half rate (~30fps); interactions paint every frame.
+    overlayFrameToggle = !overlayFrameToggle;
+    const interactive = state.gesture || state.pending || toolMode === 'tool-move' || toolMode === 'tool-crop';
+    if (interactive || overlayFrameToggle) {
+      state.antsOffset = (state.antsOffset + OVERLAY_STYLE.antsSpeed * (interactive ? 1 : 2)) % 18;
+      try { paintOverlay(); }
+      catch (error) { console.warn('[Luma] Tool overlay paint failed', error); }
+    }
     requestAnimationFrame(overlayLoop);
   }
 
@@ -1116,6 +1252,7 @@
 
     if (modified && !event.altKey) {
       if (lower === 'd' && !event.shiftKey) { event.preventDefault(); deselectActiveMask(); return; }
+      if (lower === 'd' && event.shiftKey) { event.preventDefault(); reselectLastMask(); return; }
       if (lower === 'i' && event.shiftKey) { event.preventDefault(); invertActiveMask(); return; }
       if (lower === 'a' && !event.shiftKey) { event.preventDefault(); selectAllRegion(); return; }
       return;
@@ -1142,13 +1279,25 @@
     if (!current) return;
     cancelPending();
     if (current.edits.masks.activeId) {
+      state.lastDeselectedId = current.edits.masks.activeId;
       current.edits.masks.activeId = '';
       refreshControls();
       scheduleRender();
       debounceSave();
     }
     setTool('');
-    toast('Selection deselected (Ctrl+D)');
+    toast('Deselected · Ctrl+Shift+D reselects');
+  }
+
+  function reselectLastMask() {
+    if (!current) return;
+    const layer = state.lastDeselectedId ? maskById(state.lastDeselectedId) : null;
+    if (!layer) { toast('Nothing to reselect'); return; }
+    current.edits.masks.activeId = layer.id;
+    refreshControls();
+    scheduleRender();
+    debounceSave();
+    toast('Reselected ' + layer.name);
   }
 
   function invertActiveMask() {
@@ -1200,7 +1349,10 @@
     if (!RAIL_TOOL_MODES.includes(mode)) { cancelPending(); }
     baseSetTool(mode, options);
     if (toolMode === 'tool-crop') routeCrop('enter', null);
-    if (!options.quiet && TOOL_INSTRUCTIONS[toolMode]) toast(TOOL_INSTRUCTIONS[toolMode]);
+    if (!options.quiet && TOOL_INSTRUCTIONS[toolMode] && !state.instructedTools.has(toolMode)) {
+      state.instructedTools.add(toolMode);
+      toast(TOOL_INSTRUCTIONS[toolMode]);
+    }
     syncRail();
     renderOptions();
   };
@@ -1226,6 +1378,7 @@
     TOOLS,
     activateTool,
     commitRegion,
+    addSelectionLayer,
     activeGeometryMask,
     screenFromSourceMatrix,
     orientedDims,
@@ -1233,6 +1386,9 @@
     pointerFraction,
     requestDraft,
     cancelPendingDraft,
+    beginCanvasWarp,
+    drawCanvasWarp,
+    endCanvasWarp,
     refresh() { syncRail(); renderOptions(); },
     editActiveSelection() {
       state.combine = 'add';

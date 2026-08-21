@@ -436,6 +436,7 @@
       startStraighten: current.edits.geometry.straighten,
       before: E.clone(current.edits), photoId: current.id, moved: false
     };
+    rail.beginCanvasWarp(crop.gesture);
     bindWindowGesture();
   }
 
@@ -457,6 +458,7 @@
       startXOffset: geometry.xOffset, startYOffset: geometry.yOffset,
       before: E.clone(current.edits), photoId: current.id, moved: false
     };
+    rail.beginCanvasWarp(crop.gesture);
     bindWindowGesture();
   }
 
@@ -500,6 +502,7 @@
     crop.gesture = null;
     if (gesture.kind === 'straighten' || gesture.kind === 'photo') {
       rail.cancelPendingDraft();
+      rail.endCanvasWarp(gesture);
       if (gesture.moved && current?.id === gesture.photoId) {
         // No history push here: everything between enter() and apply() lands in
         // the single "Crop photo" undo step (cancel restores the snapshot).
@@ -600,7 +603,13 @@
     current.edits.geometry.straighten = Math.round(degrees * 10) / 10;
     gesture.moved = true;
     catalogDirty = true;
-    rail.requestDraft();
+    const delta = (current.edits.geometry.straighten - gesture.startStraighten) * Math.PI / 180;
+    const painted = rail.drawCanvasWarp(gesture, (context, canvas) => {
+      context.translate(canvas.width / 2, canvas.height / 2);
+      context.rotate(delta);
+      context.translate(-canvas.width / 2, -canvas.height / 2);
+    });
+    if (!painted) rail.requestDraft();
     const slider = $('#cropStraightenRange');
     if (slider) slider.value = String(current.edits.geometry.straighten);
   }
@@ -627,7 +636,31 @@
       else geometry.stretchY = bounded(gesture.startStretchY * ratio, 25, 400);
     }
     catalogDirty = true;
-    rail.requestDraft();
+    const canvasElement = $('#canvas');
+    const scaleToBacking = canvasElement.width / gesture.display.width;
+    const centerX = gesture.center.x * scaleToBacking, centerY = gesture.center.y * scaleToBacking;
+    const painted = rail.drawCanvasWarp(gesture, context => {
+      if (gesture.part === 'photo-pan') {
+        const dx = (geometry.xOffset - gesture.startXOffset) / 200 * gesture.dims.width * (canvasElement.width / gesture.metrics.cw);
+        const dy = (geometry.yOffset - gesture.startYOffset) / 200 * gesture.dims.height * (canvasElement.height / gesture.metrics.ch);
+        context.translate(dx, dy);
+      } else if (gesture.part === 'photo-scale') {
+        const ratio = geometry.scale / gesture.startScale;
+        context.translate(centerX, centerY);
+        context.scale(ratio, ratio);
+        context.translate(-centerX, -centerY);
+      } else {
+        const axis = gesture.part === 'photo-stretch-x' ? gesture.axisX : gesture.axisY;
+        const ratio = gesture.part === 'photo-stretch-x' ? geometry.stretchX / gesture.startStretchX : geometry.stretchY / gesture.startStretchY;
+        const angle = Math.atan2(axis.y, axis.x);
+        context.translate(centerX, centerY);
+        context.rotate(angle);
+        context.scale(ratio, 1);
+        context.rotate(-angle);
+        context.translate(-centerX, -centerY);
+      }
+    });
+    if (!painted) rail.requestDraft();
   }
 
   function bounded(value, min, max) { return Math.max(min, Math.min(max, value)); }

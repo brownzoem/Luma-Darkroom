@@ -217,6 +217,7 @@ async function livePage(app) {
     refreshControls();
   });
   await page.click('[data-panel="mask"]');
+  await page.click('#addMaskMenuBtn');
   await page.click('#addLinearMask');
   const focusArmed = await page.evaluate(() => ({ enabled: current.edits.masks.layers[0]?.enabled, dirty: catalogDirty, undoEntries: undoByPhoto.get(current.id)?.length || 0, toolMode }));
   const focusCanvas = await page.locator('#canvas').boundingBox();

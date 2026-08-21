@@ -31,7 +31,7 @@ const appIntegrationGlobals = {
   toolMode: 'readonly', spacePanActive: 'readonly',
   MAX_MASK_LAYERS: 'readonly', BRUSH_TOOLS: 'readonly', RETOUCH_TOOLS: 'readonly',
   GRADIENT_TOOLS: 'readonly', POINT_TOOLS: 'readonly',
-  activeMask: 'readonly', activateMaskBrush: 'readonly', addMaskAndActivate: 'readonly',
+  activeMask: 'readonly', maskById: 'readonly', activateMaskBrush: 'readonly', addMaskAndActivate: 'readonly',
   beginSmartObjectSelection: 'readonly', commit: 'readonly', pushHistory: 'readonly',
   refreshControls: 'readonly', scheduleRender: 'readonly', debounceSave: 'readonly',
   switchRightPanel: 'readonly', toast: 'readonly', uid: 'readonly',

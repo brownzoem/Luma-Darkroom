@@ -70,7 +70,7 @@
   <dialog id="modelDownloadDialog" aria-labelledby="modelDownloadTitle" aria-describedby="modelDownloadCopy"><form method="dialog"><header><h2 id="modelDownloadTitle">Add local selection model</h2><button id="modelDownloadClose" value="cancel" aria-label="Close model download">×</button></header><p id="modelDownloadCopy">This optional model runs on this computer. Photographs are not uploaded.</p><div class="model-card"><b id="modelDownloadName"></b><span id="modelDownloadSize"></span><small>Apache-2.0 model pack · immutable source · exact hash verified before use · removable in Help</small></div><p class="curve-help">The upstream model publisher does not provide this project with a warranty for every training image. The pack is optional and is never bundled silently.</p><div id="modelDownloadProgress" class="model-progress hidden" role="progressbar" aria-label="Model download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i><span>Preparing…</span></div><p id="modelDownloadError" class="guide-status hidden" role="alert"></p><div class="dialog-actions"><button id="modelDownloadCancel" type="button" class="ghost">Cancel</button><button id="modelDownloadStart" type="button" class="primary">Download &amp; continue</button></div></form></dialog>
   <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle" aria-describedby="helpIntro">
     <form method="dialog">
-      <header><div><div class="dialog-kicker">LUMA DARKROOM 3.0.0</div><h2 id="helpTitle">Help Center</h2></div><button value="cancel" aria-label="Close Help Center">×</button></header>
+      <header><div><div class="dialog-kicker">LUMA DARKROOM 3.1.0</div><h2 id="helpTitle">Help Center</h2></div><button value="cancel" aria-label="Close Help Center">×</button></header>
       <p id="helpIntro" class="help-intro">Learn the workflow, review shortcuts, or open the installation and user guide.</p>
       <div class="help-actions">
         <button id="startTutorialBtn" type="button" class="primary">Start interactive tutorial</button>
@@ -93,7 +93,9 @@
           <span>Color sampler / Heal</span><kbd>I / J</kbd>
           <span>Zoom / Hand tool</span><kbd>Z / H</kbd>
           <span>Add to / subtract / intersect selection</span><kbd>Shift / Alt / Shift Alt + draw</kbd>
-          <span>Deselect / Invert mask</span><kbd>Ctrl D / Ctrl Shift I</kbd>
+          <span>Deselect / Reselect / Invert mask</span><kbd>Ctrl D / Ctrl Shift D / Ctrl Shift I</kbd>
+          <span>Rename mask layer</span><kbd>Double-click or F2</kbd>
+          <span>View mask / disable mask</span><kbd>Alt / Shift + click thumbnail</kbd>
           <span>Select all</span><kbd>Ctrl A</kbd>
           <span>Crop: apply / cancel</span><kbd>Enter / Esc</kbd>
           <span>Crop: guides / swap aspect</span><kbd>O / X</kbd>
@@ -111,6 +113,9 @@
           <span>Temporary Eraser</span><kbd>Hold Alt</kbd>
           <span>Pan photograph</span><kbd>Hold Space + drag</kbd>
           <span>Zoom / Fit</span><kbd>Ctrl + / − / 0</kbd>
+          <span>Zoom at the cursor</span><kbd>Ctrl + scroll wheel</kbd>
+          <span>Copy / paste develop settings</span><kbd>Ctrl Shift C / Ctrl Shift V</kbd>
+          <span>Reset one slider</span><kbd>Double-click it</kbd>
           <span>Edit tone curve</span><kbd>Enter / Ctrl ←→ / Arrows / Delete</kbd>
           <span>Close dialog or tool</span><kbd>Esc</kbd>
         </div>

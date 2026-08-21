@@ -45,6 +45,7 @@ async function waitForPreview(page) {
     backing: [canvas.width, canvas.height],
     display: [canvas.getBoundingClientRect().width, canvas.getBoundingClientRect().height]
   }));
+  await page.click('#addMaskMenuBtn');
   await page.click('#addDodgeMask');
   await page.waitForTimeout(120);
   const activation = await page.evaluate(() => ({
@@ -69,6 +70,7 @@ async function waitForPreview(page) {
   await page.keyboard.press('KeyE');
   const subtractMode = await page.evaluate(() => toolMode);
   const guardedSize = await page.evaluate(() => activeMask().brushSize);
+  await page.locator('#maskList .mask-row.active').dblclick();
   await page.focus('#maskName');
   await page.keyboard.press('BracketRight');
   const inputGuardSize = await page.evaluate(() => activeMask().brushSize);

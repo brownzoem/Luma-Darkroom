@@ -26,8 +26,16 @@ Project website and user guide: <https://lumadarkroom.com>
   contextual options bar.
 - On-canvas selections with marching-ants feedback that become regular mask
   layers: combine with Shift (add), Alt (subtract), and Shift+Alt (intersect),
-  deselect with Ctrl+D, invert with Ctrl+Shift+I, and refine any selection
-  with the add/subtract brushes, feathering, and range intersections.
+  deselect with Ctrl+D (Ctrl+Shift+D reselects), invert with Ctrl+Shift+I,
+  and refine any selection with the add/subtract brushes, feathering, and
+  range intersections. Drawing never multiplies layers: a fresh drag
+  replaces the active selection's shape (its adjustments stay), and new
+  layers come only from the ＋ Add mask dropdown or the ＋ New layer button.
+- A pro-style mask layers panel: each row shows a live grayscale thumbnail
+  of its mask, its name and type, drag-and-drop reordering, double-click
+  (or F2) inline renaming, and a ⋯ / right-click menu with Rename,
+  Duplicate, Invert, Disable, Move, and Delete. Alt+click a thumbnail to
+  view the mask itself in grayscale on the canvas; Shift+click disables it.
 - A non-destructive stack of up to eight independent subject, object, people,
   background, sky, brush, linear-gradient, radial-gradient, range, and
   geometry-selection masks.
@@ -90,7 +98,9 @@ In the Develop view, single letters select editing tools; culling letters
 | Add / subtract / intersect while drawing a selection | Shift / Alt / Shift + Alt |
 | Constrain square (during marquee drag) / draw from center | Shift / Alt |
 | Close a polygon or pen path / remove last point | Enter or double-click / Backspace |
-| Deselect / invert the active mask | Ctrl + D / Ctrl + Shift + I |
+| Deselect / reselect / invert the active mask | Ctrl + D / Ctrl + Shift + D / Ctrl + Shift + I |
+| Rename the selected mask layer | Double-click its row, or F2 |
+| View mask in grayscale / disable mask | Alt + click / Shift + click its thumbnail |
 | Select all | Ctrl + A |
 | Crop: apply / cancel / cycle guides / swap aspect | Enter / Esc / O / X |
 | Previous / next photograph | Left / Right |
@@ -111,6 +121,9 @@ In the Develop view, single letters select editing tools; culling letters
 | Temporarily subtract while painting | Hold Alt |
 | Pan a zoomed photograph | Hold Space and drag |
 | Zoom in / out / Fit | Ctrl + + / Ctrl + - / Ctrl + 0 |
+| Zoom at the cursor | Ctrl + scroll wheel (pinch on trackpads) |
+| Copy / paste develop settings between photos | Ctrl + Shift + C / Ctrl + Shift + V |
+| Reset a single slider to its default | Double-click the slider or its label |
 | Add / select / move / delete a tone-curve point | Enter / Ctrl + Left or Right / Arrow keys / Delete |
 
 ## Install

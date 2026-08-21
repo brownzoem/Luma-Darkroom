@@ -44,9 +44,10 @@ self.onmessage = event => {
   try {
     const canvas = LumaEngine.render(sourceBitmap, message.edits, {
       maxEdge: message.maxEdge,
-      visualizeMask: message.visualizeMask
+      visualizeMask: message.visualizeMask,
+      maskOnly: message.maskOnly || ''
     });
-    if (message.clipping) applyClipping(canvas);
+    if (message.clipping && !message.maskOnly) applyClipping(canvas);
     const bitmap = canvas.transferToImageBitmap();
     self.postMessage({
       type: 'rendered',

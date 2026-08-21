@@ -5,6 +5,55 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+## 3.1.0 - 2026-08-21
+
+### Added
+
+- A pro-style mask layers panel: every mask row shows a live grayscale
+  thumbnail of its mask (with a red × when disabled), the mask's name and
+  type, drag-and-drop reordering with a drop indicator, double-click (or F2)
+  inline renaming, and a ⋯ / right-click menu with Rename, Duplicate,
+  Invert, Disable, Move, and Delete.
+- One ＋ Add mask dropdown replaces the wall of mask-type buttons; every
+  mask kind (Selection, Brush, gradients, AI selections, Sky, ranges,
+  Dodge/Burn) is created from it — or from the ＋ New layer button in the
+  selection tools' options bar.
+- Thumbnail gestures from the pro-editor playbook: Alt+click views the mask
+  itself in grayscale on the canvas (Esc returns), Shift+click disables the
+  mask, and Ctrl+Shift+D reselects the last deselected mask.
+- A neutral white-balance eyedropper in the Color panel: click anything that
+  should be neutral gray and temperature/tint solve to match.
+- Ctrl/⌘ + scroll wheel zooms about the cursor (trackpad pinch included),
+  with the full-quality render following when the gesture settles.
+- Copy and paste develop settings between photographs with Ctrl+Shift+C and
+  Ctrl+Shift+V; crop, masks, and repairs stay per-photo, matching preset
+  scope.
+- Double-click any adjustment slider (or its label) to reset just that
+  control to its default.
+- The export dialog now explains shape-crop transparency per format: JPEG
+  fills the outside of the shape with white, while PNG/WebP/TIFF keep it
+  transparent.
+
+### Changed
+
+- Drawing a selection no longer creates a mask layer per drag: with combine
+  "New" the drawn shape replaces the active selection's regions (its
+  adjustments, feather, and refinements stay); layers are only added through
+  the explicit ＋ actions. Shift/Alt/Shift+Alt still add, subtract, and
+  intersect.
+- The per-mask opacity slider is labeled Density, matching the terminology
+  professionals expect.
+- Tool instruction toasts appear once per session per tool; the options bar
+  carries the hint from then on.
+
+### Fixed
+
+- Marching-ants overlay paths are cached and the idle overlay animates at
+  half rate, removing tool-rail sluggishness with large lasso selections.
+- Moving, zooming, stretching, or straightening the photo now previews by
+  warping the existing frame at full frame-rate instead of re-rendering the
+  pipeline on every pointer move; one real render lands on release.
+
 ## 3.0.0 - 2026-08-20
 
 ### Added

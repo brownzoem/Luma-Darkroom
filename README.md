@@ -63,7 +63,11 @@ Project website and user guide: <https://lumadarkroom.com>
 - Before/original comparison, two-photo comparison, a filmstrip, zoom, rotate,
   flip, and edit history.
 - JPEG, PNG, WebP, and TIFF export, original-file copy, size and quality
-  controls, and optional text watermarks.
+  controls, and optional text watermarks — for the active photograph or as
+  a batch of every selected photograph into one folder, with per-file
+  progress, cancellation, and automatic name uniquing.
+- A live RGB readout under the cursor and a scrubby Zoom tool (drag left or
+  right) for critical inspection.
 - JPEG, PNG, WebP, BMP, GIF, TIFF, and AVIF import. Camera-RAW and HEIC import
   are not advertised because the packaged Windows decoder does not reliably
   support them.

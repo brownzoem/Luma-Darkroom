@@ -766,9 +766,13 @@ function moveMaskBrush(e){updateBrushCursor(e);if(!maskBrushGesture||e.pointerId
 function finishMaskBrush(e,{includeEndpoint=true}={}){if(!maskBrushGesture||e.pointerId!==maskBrushGesture.pointerId)return;const gesture=maskBrushGesture;if(gesture.renderTimer)clearTimeout(gesture.renderTimer);if(includeEndpoint&&gesture.kind==='brush'){const samples=brushSamples(e);samples.forEach((sample,index)=>appendMaskBrushSample(sample,{forceEndpoint:index===samples.length-1}))}maskBrushGesture=null;try{$('#canvas').releasePointerCapture?.(e.pointerId)}catch{}const layer=current?.id===gesture.photoId?maskById(gesture.maskId):null,path=layer?.strokes.find(stroke=>stroke.kind==='path'&&stroke.id===gesture.pathId);if(path&&!path.points.length)layer.strokes=layer.strokes.filter(stroke=>stroke!==path);if(layer&&(gesture.kind!=='brush'||path?.points.length))pushHistory(gesture.before,current.edits,gesture.kind==='gradient'?'Set mask gradient':gesture.mode==='add'?'Add to mask':'Subtract from mask');liveBrushCommitRequestId=scheduleRender();debounceSave();updateMaskUI()}
 
 function switchRightPanel(name){if(name!=='presets'&&batchPresetMode){batchPresetMode=false;toast('Batch preset canceled')}$$('.panel-tabs button').forEach(b=>{const active=b.dataset.panel===name;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1});$('#editPanel').classList.toggle('hidden',name!=='edit');$('#presets').classList.toggle('hidden',name!=='presets');$('#maskPanel').classList.toggle('hidden',name!=='mask');const right=$('.right');if(right)right.scrollTop=0;requestAnimationFrame(updateGradientGuide)}
-function updateExportOptions(){const format=$('#exportFormat').value,original=format==='original',lossless=format==='png'||format==='tiff';$('#exportQuality').disabled=original||lossless;$('#exportSize').disabled=original;$('#exportWatermark').disabled=original;$('#exportQualityField').classList.toggle('disabled-field',original||lossless);$('#exportSizeField').classList.toggle('disabled-field',original);$('#exportWatermarkField').classList.toggle('disabled-field',original);const note=$('#exportFormatNote');const shapeCropped=!original&&!!current?.edits?.geometry?.cropShapeKind;if(original){note.textContent='Original file copies the source unchanged; resize, quality, watermark, and current edits do not apply.';note.classList.remove('hidden')}else if(shapeCropped&&format==='jpeg'){note.textContent='This photo has a shape crop. JPEG cannot store transparency, so the area outside the shape fills with white — choose PNG, WebP, or TIFF to keep it transparent.';note.classList.remove('hidden')}else if(shapeCropped){note.textContent='This photo has a shape crop; the area outside the shape stays transparent in this format.';note.classList.remove('hidden')}else if(lossless){note.textContent='This format is lossless, so the Quality setting does not apply.';note.classList.remove('hidden')}else note.classList.add('hidden');updateActionState()}
+function updateExportOptions(){const format=$('#exportFormat').value,original=format==='original',lossless=format==='png'||format==='tiff',batch=exportScopeIsBatch();const originalOption=$('#exportFormat option[value="original"]');if(originalOption)originalOption.disabled=batch;const targetLine=$('#exportTarget');if(targetLine)targetLine.textContent=batch?`Batch: ${selectedExportTargets().length} selected photographs → one folder, no per-file dialogs`:current?`Active photograph: ${current.name}`:'';$('#exportQuality').disabled=original||lossless;$('#exportSize').disabled=original;$('#exportWatermark').disabled=original;$('#exportQualityField').classList.toggle('disabled-field',original||lossless);$('#exportSizeField').classList.toggle('disabled-field',original);$('#exportWatermarkField').classList.toggle('disabled-field',original);const note=$('#exportFormatNote');const shapeCropped=!original&&!!current?.edits?.geometry?.cropShapeKind;if(original){note.textContent='Original file copies the source unchanged; resize, quality, watermark, and current edits do not apply.';note.classList.remove('hidden')}else if(shapeCropped&&format==='jpeg'){note.textContent='This photo has a shape crop. JPEG cannot store transparency, so the area outside the shape fills with white — choose PNG, WebP, or TIFF to keep it transparent.';note.classList.remove('hidden')}else if(shapeCropped){note.textContent='This photo has a shape crop; the area outside the shape stays transparent in this format.';note.classList.remove('hidden')}else if(lossless){note.textContent='This format is lossless, so the Quality setting does not apply.';note.classList.remove('hidden')}else note.classList.add('hidden');updateActionState()}
 let activeExportWorker=null,activeExportCancel=null,exportJob=0;
 function exportAbortError(){return new DOMException('Export canceled','AbortError')}
+// True while an export that was started from the open dialog is running; the
+// dialog's close event only cancels those, so a stale queued close can never
+// abort a later programmatic run.
+let exportRunFromDialog=false;
 function cancelExportRender(){exportJob++;const cancel=activeExportCancel;activeExportCancel=null;if(cancel){cancel();return}if(activeExportWorker){activeExportWorker.terminate();activeExportWorker=null}}
 async function renderExportInWorker(image,edits,options){
   if(typeof Worker!=='function'||typeof createImageBitmap!=='function')throw new Error('Background export is unavailable on this system.');
@@ -776,8 +780,60 @@ async function renderExportInWorker(image,edits,options){
   let worker;try{worker=new Worker('render-worker.js')}catch(error){bitmap.close();throw error}const id=`export-${Date.now()}-${job}`;activeExportWorker=worker;
   return new Promise((resolve,reject)=>{let settled=false,timeout;const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timeout);if(activeExportWorker===worker)activeExportWorker=null;if(activeExportCancel===cancel)activeExportCancel=null;worker.onmessage=worker.onerror=worker.onmessageerror=null;worker.terminate();error?reject(error):resolve(value)},cancel=()=>finish(exportAbortError());activeExportCancel=cancel;timeout=setTimeout(()=>finish(new Error('Export rendering timed out. Try a smaller output size.')),180000);worker.onerror=event=>{event.preventDefault?.();finish(new Error(event.message||'The background export worker failed.'))};worker.onmessageerror=()=>finish(new Error('The background export worker returned an unreadable response.'));worker.onmessage=event=>{const message=event.data||{};if(message.id!==id)return;if(message.progress){toast(message.progress==='encoding'?'Encoding export…':'Rendering export in the background…');return}if(message.error){finish(new Error(message.error));return}if(message.bytes)finish(null,message)};try{worker.postMessage({id,bitmap,edits,maxEdge:options.maxEdge,watermark:options.watermark,mime:options.mime,quality:options.quality},[bitmap])}catch(error){bitmap.close();finish(error)}})
 }
+function selectedExportTargets(){return photos.filter(photo=>photo.selected)}
+function exportScopeIsBatch(){return $('#exportScope')?.value==='selected'&&selectedExportTargets().length>0}
+/**
+ * Batch export: render every selected photograph in the background and write
+ * each into one user-approved folder (no per-file dialogs). `directory` can
+ * be injected by tests; the interactive path asks the OS picker once.
+ */
+async function doBatchExport({directory=null}={}){
+  const targets=selectedExportTargets(),dialog=$('#exportDialog'),exportButton=$('#doExport'),progress=$('#exportProgress');
+  if(!targets.length){toast('Select photographs in the Library first');return}
+  const format=$('#exportFormat').value;
+  if(format==='original'){toast('Batch export renders edits; choose JPEG, PNG, WebP, or TIFF');return}
+  const destination=directory||await window.desktop.pickExportDirectory();
+  if(!destination)return;
+  const size=Math.max(0,Math.round(num($('#exportSize').value,0))),quality=Math.max(.1,Math.min(1,num($('#exportQuality').value,92)/100)),watermark=$('#exportWatermark').value.trim().slice(0,80);
+  const mime={jpg:'image/jpeg',png:'image/png',webp:'image/webp',tiff:'image/png'}[format]||'image/jpeg';
+  exportButton.disabled=true;dialog.setAttribute('aria-busy','true');progress.classList.remove('hidden');
+  const dialogWasOpen=dialog.open,written=[],failed=[];let cancelled=false,cancelDetail='';
+  exportRunFromDialog=dialogWasOpen;
+  try{
+    for(let index=0;index<targets.length;index++){
+      const photo=targets[index];
+      progress.textContent=`Exporting ${index+1} of ${targets.length} · ${photo.name}`;
+      let image=null,transient=false;
+      try{
+        if(photo===current&&sourceImage.complete&&sourceImage.naturalWidth)image=sourceImage;
+        else{image=await loadImage(photo.url);transient=true}
+        const exportEdits=E.clone(photo.edits);exportEdits.pointColor.visualize=false;
+        const rendered=await renderExportInWorker(image,exportEdits,{maxEdge:size||null,watermark,mime,quality});
+        const target=await window.desktop.exportImageInto({directory:destination,fileName:photo.name.replace(/\.[^.]+$/,'')+'-luma',bytes:rendered.bytes,mime:rendered.mime,format,quality:Math.round(quality*100)});
+        if(target)written.push(target);
+      }catch(error){
+        if(error?.name==='AbortError'){cancelled=true;cancelDetail=`${photo.name}: ${String(error?.message||'abort').slice(0,120)}`;break}
+        failed.push(photo.name);
+        console.warn('[Luma] Batch export failed for',photo.name,error);
+      }finally{if(transient&&image)image.src=''}
+      if(dialogWasOpen&&!dialog.open){cancelled=true;break}
+    }
+  }finally{
+    exportRunFromDialog=false;
+    progress.classList.add('hidden');progress.textContent='';
+    dialog.removeAttribute('aria-busy');updateActionState();
+  }
+  if(watermark)rememberWatermark(watermark);
+  if(cancelled)toast(`Export stopped · ${written.length} of ${targets.length} photographs saved`);
+  else if(failed.length)toast(`Exported ${written.length} of ${targets.length} · could not export ${failed.slice(0,3).join(', ')}${failed.length>3?'…':''}`);
+  else toast(`Exported ${written.length} photograph${written.length===1?'':'s'}`);
+  if(written.length&&!cancelled&&dialog.open){dialog.close();await new Promise(resolve=>setTimeout(resolve,0))}
+  if(written[0])await window.desktop.revealFile(written[0]).catch(()=>{});
+  return{written:written.length,failed:failed.length,cancelled,cancelDetail};
+}
 async function doExport(){
-  if(!current)return;const photo=current,image=sourceImage,dialog=$('#exportDialog'),exportButton=$('#doExport');let completed=false;exportButton.disabled=true;dialog.setAttribute('aria-busy','true');
+  if(exportScopeIsBatch())return doBatchExport();
+  if(!current)return;const photo=current,image=sourceImage,dialog=$('#exportDialog'),exportButton=$('#doExport');let completed=false;exportButton.disabled=true;dialog.setAttribute('aria-busy','true');exportRunFromDialog=dialog.open;
   try{
     const format=$('#exportFormat').value;if(format==='original'){const result=await window.desktop.copyOriginal({filePath:photo.filePath,suggestedName:photo.name});if(result){completed=true;toast('Original copied');await window.desktop.revealFile(result)}return}
     if(!image.complete||!image.naturalWidth||image!==sourceImage)throw new Error('The selected photo has not finished loading.');
@@ -786,7 +842,7 @@ async function doExport(){
     const mime={jpg:'image/jpeg',png:'image/png',webp:'image/webp',tiff:'image/png'}[format]||'image/jpeg',rendered=await renderExportInWorker(image,exportEdits,{maxEdge:size||null,watermark,mime,quality});
     const result=await window.desktop.exportImage({bytes:rendered.bytes,mime:rendered.mime,suggestedName:photo.name.replace(/\.[^.]+$/,'')+'-luma',format,quality:Math.round(quality*100)});if(result){completed=true;rememberWatermark(watermark);toast('Export complete');await window.desktop.revealFile(result)}
   }catch(error){if(error?.name==='AbortError')toast('Export canceled');else reportFailure('Export photo',error,error instanceof RangeError?error.message:'Export failed. Try a smaller output size or another format.')}
-  finally{dialog.removeAttribute('aria-busy');if(completed&&dialog?.open)dialog.close();else updateActionState()}
+  finally{exportRunFromDialog=false;dialog.removeAttribute('aria-busy');if(completed&&dialog?.open){dialog.close();await new Promise(resolve=>setTimeout(resolve,0))}else updateActionState()}
 }
 
 function updateCullState(message){if(view==='library')updateLibrary();else renderFilmstrip();debounceSave();toast(message)}
@@ -827,7 +883,7 @@ function releaseShortcut(e){if((e.code==='Backslash'||e.key==='\\')&&compare)set
 function confirmCatalogRestore(restored){const dialog=$('#restoreConfirmDialog');$('#restoreConfirmSummary').textContent=`Incoming catalog: ${restored.photos.length} photograph${restored.photos.length===1?'':'s'}${restored.skipped?` (${restored.skipped} invalid entr${restored.skipped===1?'y':'ies'} skipped)`:''}. Current catalog: ${photos.length} photograph${photos.length===1?'':'s'}.`;dialog.returnValue='';dialog.showModal();return new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='restore'),{once:true}))}
 
 function bindGlobal(){
-  $('#importBtn').onclick=$('#emptyImport').onclick=()=>runAsync('Import photos',()=>importPhotos(),'Photos could not be imported.');$$('.tab').forEach(t=>t.onclick=()=>setView(t.dataset.view));$('#exportBtn').onclick=()=>{if(!current)return toast('Import a photo first');$('#exportTarget').textContent=`Active photograph: ${current.name}`;updateExportOptions();$('#exportDialog').showModal()};$('#exportFormat').onchange=updateExportOptions;$('#doExport').onclick=e=>{e.preventDefault();if(e.currentTarget.form.reportValidity())doExport()};$('#exportDialog').addEventListener('close',cancelExportRender);
+  $('#importBtn').onclick=$('#emptyImport').onclick=()=>runAsync('Import photos',()=>importPhotos(),'Photos could not be imported.');$$('.tab').forEach(t=>t.onclick=()=>setView(t.dataset.view));$('#exportBtn').onclick=()=>{if(!current)return toast('Import a photo first');const selectedCount=selectedExportTargets().length,scopeField=$('#exportScopeField'),scope=$('#exportScope');scopeField.classList.toggle('hidden',selectedCount<2);scope.querySelector('option[value="selected"]').textContent=`${selectedCount} selected photographs`;if(selectedCount<2)scope.value='active';updateExportOptions();$('#exportDialog').showModal()};$('#exportFormat').onchange=updateExportOptions;$('#exportScope').onchange=updateExportOptions;$('#doExport').onclick=e=>{e.preventDefault();if(e.currentTarget.form.reportValidity())doExport()};$('#exportDialog').addEventListener('close',()=>{if(exportRunFromDialog&&(activeExportWorker||activeExportCancel))cancelExportRender()});
   $('#helpBtn').onclick=openHelpCenter;$('#openGuideBtn').onclick=()=>runAsync('Open help guide',openHelpGuide,'The guide could not be opened.');$('#startTutorialBtn').onclick=()=>{helpReturnFocus=null;$('#helpDialog').close();requestAnimationFrame(startTutorial)};$('#tutorialBack').onclick=()=>{if(tutorialStep>0){tutorialStep--;renderTutorialStep()}};$('#tutorialNext').onclick=()=>{if(tutorialStep>=tutorialSteps.length-1)finishTutorial('complete');else{tutorialStep++;renderTutorialStep()}};$('#tutorialSkip').onclick=$('#tutorialClose').onclick=()=>finishTutorial('skipped');$('#tutorialDialog').addEventListener('cancel',event=>{event.preventDefault();finishTutorial('skipped')});$('#tutorialDialog').addEventListener('close',()=>{clearTutorialTarget();document.body.classList.remove('tutorial-active')});$('#helpDialog').addEventListener('close',()=>{const returnTo=helpReturnFocus;helpReturnFocus=null;requestAnimationFrame(()=>{if(returnTo?.isConnected&&!returnTo.closest('dialog:not([open])'))returnTo.focus()})});window.addEventListener('resize',()=>{if($('#tutorialDialog').open)placeTutorial();$('#brushCursor')?.classList.add('hidden');applyZoom(+($('#zoomRange')?.value||100),{render:false,recalculate:true});requestAnimationFrame(()=>{updateKeyboardCanvasCursor();positionLiveBrushOverlay();queueLiveBrushOverlayDraw()});clearTimeout(resizeRenderTimer);resizeRenderTimer=setTimeout(()=>scheduleRender(),160)});
   $('#compareBtn').onpointerdown=()=>setCompare(true);['pointerup','pointerleave','pointercancel'].forEach(n=>$('#compareBtn').addEventListener(n,()=>setCompare(false)));$('#compareBtn').onkeydown=e=>{if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();setCompare(true)}};$('#compareBtn').onkeyup=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();setCompare(false)}};$('#compareBtn').onblur=()=>setCompare(false);
   $('#rotateLeft').onclick=()=>commit('Rotate left',()=>{current.edits.geometry.rotation90-=90;remapEditPoints('left')});$('#rotateRight').onclick=()=>commit('Rotate right',()=>{current.edits.geometry.rotation90+=90;remapEditPoints('right')});$('#flipBtn').onclick=()=>commit('Flip',()=>{current.edits.geometry.flipX=!current.edits.geometry.flipX;remapEditPoints('flip-x')});$('#resetBtn').onclick=()=>commit('Reset all',()=>current.edits=E.defaultEdits());
@@ -836,6 +892,21 @@ function bindGlobal(){
   const previewCanvas=$('#canvas');
   previewCanvas.onclick=event=>{if(suppressCanvasClick){suppressCanvasClick=false;return}const point=canvasPoint(event);if(point)keyboardCanvasPoint=point;canvasClick(event);updateKeyboardCanvasCursor()};
   previewCanvas.onkeydown=handleCanvasKeyboard;previewCanvas.onfocus=()=>{if(lastInputWasKeyboard)keyboardCanvasActive=true;updateKeyboardCanvasCursor()};previewCanvas.onblur=()=>{$('#keyboardCanvasCursor')?.classList.add('hidden');keyboardCanvasActive=false};
+  // Live RGB readout under the cursor (throttled to one sample per frame).
+  const pixelReadout=$('#pixelReadout');let pixelReadoutPending=false;
+  previewCanvas.addEventListener('pointermove',event=>{
+    if(pixelReadoutPending||!pixelReadout||!current)return;
+    pixelReadoutPending=true;
+    requestAnimationFrame(()=>{
+      pixelReadoutPending=false;
+      const rect=previewCanvas.getBoundingClientRect();
+      if(!rect.width||!rect.height){pixelReadout.textContent='';return}
+      const x=Math.floor((event.clientX-rect.left)/rect.width*previewCanvas.width),y=Math.floor((event.clientY-rect.top)/rect.height*previewCanvas.height);
+      if(x<0||y<0||x>=previewCanvas.width||y>=previewCanvas.height){pixelReadout.textContent='';return}
+      try{const data=previewCanvas.getContext('2d',{willReadFrequently:true}).getImageData(x,y,1,1).data;pixelReadout.textContent=`R ${data[0]}  G ${data[1]}  B ${data[2]}`}catch{pixelReadout.textContent=''}
+    });
+  });
+  previewCanvas.addEventListener('pointerleave',()=>{if(pixelReadout)pixelReadout.textContent=''});
   previewCanvas.addEventListener('pointerdown',event=>{const point=canvasPoint(event);if(point)keyboardCanvasPoint=point;if(!beginCanvasPan(event))beginMaskBrush(event)});previewCanvas.addEventListener('pointermove',event=>{if(!moveCanvasPan(event))moveMaskBrush(event)});previewCanvas.addEventListener('pointerenter',updateBrushCursor);previewCanvas.addEventListener('pointerleave',()=>{if(!maskBrushGesture)$('#brushCursor')?.classList.add('hidden')});previewCanvas.addEventListener('pointerup',event=>{if(!finishCanvasPan(event))finishMaskBrush(event)});previewCanvas.addEventListener('pointercancel',event=>{if(!finishCanvasPan(event))finishMaskBrush(event,{includeEndpoint:false})});previewCanvas.addEventListener('lostpointercapture',event=>{if(!finishCanvasPan(event))finishMaskBrush(event,{includeEndpoint:false})});
   $('#fitBtn').onclick=()=>applyZoom(100);$('#zoomRange').oninput=e=>applyZoom(+e.target.value,{render:false});$('#zoomRange').onchange=()=>scheduleRender();
   // Ctrl/⌘ + wheel zooms about the cursor (trackpad pinch arrives as ctrl+wheel).

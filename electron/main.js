@@ -217,9 +217,11 @@ app.whenReady().then(() => {
     const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'Supported photos', extensions: ['jpg','jpeg','png','webp','bmp','gif','tif','tiff','avif'] }] });
     return result.canceled ? [] : result.filePaths.map(filePath => ({ filePath, name: path.basename(filePath), url: imageUrl(filePath) }));
   });
-  ipcMain.handle('export-image', async (event, payload = {}) => {
-    assertTrustedIpc(event);
-    const { dataUrl, bytes, mime, suggestedName, format, quality } = payload && typeof payload === 'object' ? payload : {};
+  // Shared validation for every rendered-export payload: strict mime/size
+  // checks, a sharp re-decode gate, and TIFF re-encoding. Returns the bytes
+  // ready to write plus the target extension.
+  const decodeValidatedExport = async payload => {
+    const { dataUrl, bytes, mime, format, quality } = payload && typeof payload === 'object' ? payload : {};
     const allowedMime = new Set(['image/jpeg','image/png','image/webp']);
     let input;
     if (bytes instanceof ArrayBuffer || ArrayBuffer.isView(bytes)) {
@@ -235,11 +237,42 @@ app.whenReady().then(() => {
     const decodedPixels = Number(metadata.width || 0) * Number(metadata.height || 0) * Math.max(1, Number(metadata.pages || 1));
     const expectedInput = { jpg:'jpeg', png:'png', webp:'webp', tiff:'png' }[ext];
     if (!Number.isSafeInteger(decodedPixels) || decodedPixels < 1 || decodedPixels > 50_000_000 || metadata.format !== expectedInput) throw new Error('Encoded export format or dimensions are invalid');
-    const result = await dialog.showSaveDialog({ defaultPath: `${safeName(suggestedName,'edited')}.${ext}`, filters: [{ name: ext.toUpperCase(), extensions: [ext] }] });
+    const output = ext === 'tiff' ? await sharp(input).tiff({ compression:'lzw', quality:Math.max(1,Math.min(100,+(quality)||92)) }).toBuffer() : input;
+    return { output, ext };
+  };
+  ipcMain.handle('export-image', async (event, payload = {}) => {
+    assertTrustedIpc(event);
+    const { output, ext } = await decodeValidatedExport(payload);
+    const result = await dialog.showSaveDialog({ defaultPath: `${safeName(payload?.suggestedName,'edited')}.${ext}`, filters: [{ name: ext.toUpperCase(), extensions: [ext] }] });
     if (result.canceled) return null;
-    const output = ext === 'tiff' ? await sharp(input).tiff({ compression:'lzw', quality:Math.max(1,Math.min(100,+quality||92)) }).toBuffer() : input;
     await atomicWrite(result.filePath, output);
     return result.filePath;
+  });
+  // Batch export: one user-approved destination folder, then per-file writes
+  // without further dialogs. Only folders picked this session (or supplied by
+  // the launcher through LUMA_ALLOW_EXPORT_DIR for automated tests) are valid.
+  const approvedExportDirectories = new Set();
+  if (process.env.LUMA_ALLOW_EXPORT_DIR) approvedExportDirectories.add(path.resolve(process.env.LUMA_ALLOW_EXPORT_DIR));
+  ipcMain.handle('pick-export-directory', async event => {
+    assertTrustedIpc(event);
+    const result = await dialog.showOpenDialog({ title: 'Choose an export folder', properties: ['openDirectory', 'createDirectory'] });
+    if (result.canceled || !result.filePaths[0]) return null;
+    const directory = path.resolve(result.filePaths[0]);
+    approvedExportDirectories.add(directory);
+    return directory;
+  });
+  ipcMain.handle('export-image-into', async (event, payload = {}) => {
+    assertTrustedIpc(event);
+    const directory = typeof payload?.directory === 'string' ? path.resolve(payload.directory) : '';
+    if (!directory || !approvedExportDirectories.has(directory)) throw new Error('That export folder has not been approved in this session');
+    if (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) throw new Error('The export folder is unavailable');
+    const { output, ext } = await decodeValidatedExport(payload);
+    const base = safeName(payload?.fileName, 'edited');
+    let target = path.join(directory, `${base}.${ext}`);
+    for (let suffix = 2; fs.existsSync(target) && suffix < 1000; suffix++) target = path.join(directory, `${base} (${suffix}).${ext}`);
+    if (fs.existsSync(target)) throw new Error('Could not find a free file name in the export folder');
+    await atomicWrite(target, output);
+    return target;
   });
   ipcMain.handle('copy-original', async (event, payload = {}) => {
     assertTrustedIpc(event);

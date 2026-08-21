@@ -35,7 +35,7 @@ size and SHA-256, and run locally; photographs are not uploaded for selection.
 | HDR edit and output | Not available | Exposure averaging produces an ordinary SDR image; there is no floating-point HDR display or export path. |
 | Exposure averaging | Limited | Bounded average of same-size decoded frames with no alignment, deghosting, or HDR encoding. |
 | Panorama helper | Limited | Bounded horizontal strip with overlap; no feature matching, warping, projection, or seam optimization. |
-| Export | Limited | JPEG, PNG, WebP, 8-bit TIFF, original copy, sizing, quality, and text watermark; no HDR/color-space/metadata controls. |
+| Export | Limited | JPEG, PNG, WebP, 8-bit TIFF, original copy, sizing, quality, text watermark, and batch export of selected photographs into one folder; no HDR/color-space/metadata controls. |
 
 ## Masks and retouching
 

@@ -193,3 +193,6 @@ dialog:not(.tutorial-dialog){max-height:calc(100vh - 28px);overflow:auto}dialog 
 .mask-row.dragging{opacity:.45}
 .mask-row.drop-before::before{content:'';position:absolute;left:2px;right:2px;top:-2px;height:2.5px;border-radius:2px;background:var(--accent)}
 .mask-row.drop-after::after{content:'';position:absolute;left:2px;right:2px;bottom:-2px;height:2.5px;border-radius:2px;background:var(--accent)}
+
+/* --- Live RGB readout in the canvas toolbar --- */
+.pixel-readout{font:500 11.5px/1 "IBM Plex Mono",Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--muted);min-width:118px;text-align:left;letter-spacing:.02em}

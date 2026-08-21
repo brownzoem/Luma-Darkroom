@@ -83,7 +83,7 @@
     { id: 'crop', key: 'C', name: 'Crop & shape crop', hint: 'Drag the handles. Enter applies, Esc cancels, O cycles guides, X swaps the aspect.', mode: 'tool-crop' },
     { id: 'eyedropper', key: 'I', name: 'Color sampler', mode: 'color', activate: () => setTool('color', { force: true }) },
     { id: 'heal', key: 'J', name: 'Heal / retouch', mode: 'cleanup', matches: mode => RETOUCH_TOOLS.includes(mode), activate: () => { switchRightPanel('mask'); setTool('cleanup', { force: true }); } },
-    { id: 'zoom', key: 'Z', name: 'Zoom', hint: 'Click to zoom in, Alt+click to zoom out, double-click to fit.', mode: 'tool-zoom' },
+    { id: 'zoom', key: 'Z', name: 'Zoom', hint: 'Click zooms in · Alt+click out · drag left/right for scrubby zoom · double-click fits.', mode: 'tool-zoom' },
     { id: 'hand', key: 'H', name: 'Hand (pan)', hint: 'Drag to pan the zoomed photo.', mode: 'tool-hand' }
   ];
 
@@ -529,7 +529,13 @@
       return;
     }
     if (toolMode === 'tool-zoom') {
-      state.gesture = { kind: 'zoom-click', pointerId: event.pointerId, alt: event.altKey };
+      // Click = step zoom · horizontal drag = scrubby zoom anchored at the press point.
+      state.gesture = {
+        kind: 'zoom-click', pointerId: event.pointerId, alt: event.altKey, moved: false,
+        startClientX: event.clientX, startClientY: event.clientY,
+        startZoom: +($('#zoomRange')?.value || 100),
+        anchorFx: fraction.x, anchorFy: fraction.y
+      };
       return;
     }
     if (toolMode === 'tool-move') { beginTransformGesture(event, fraction, rect); return; }
@@ -573,6 +579,21 @@
       $wrap().scrollTop = gesture.top - (event.clientY - gesture.startY);
       return;
     }
+    if (gesture.kind === 'zoom-click') {
+      const dx = event.clientX - gesture.startClientX;
+      if (!gesture.moved && Math.abs(dx) < 5) return;
+      gesture.moved = true;
+      const target = Math.max(25, Math.min(200, Math.round(gesture.startZoom + dx / 3)));
+      if (target !== +($('#zoomRange')?.value || 100)) {
+        applyZoom(target, { render: false });
+        const after = canvasDisplayRect(), wrap = $wrap();
+        if (after) {
+          wrap.scrollLeft += after.left + gesture.anchorFx * after.width - gesture.startClientX;
+          wrap.scrollTop += after.top + gesture.anchorFy * after.height - gesture.startClientY;
+        }
+      }
+      return;
+    }
     const fraction = pointerFraction(event);
     if (!fraction) return;
     if (gesture.kind === 'marquee') { gesture.currentPoint = fraction; gesture.constrain = event.shiftKey; gesture.fromCenter = event.altKey; return; }
@@ -611,6 +632,7 @@
     if (gesture.kind === 'crop') { routeCrop('pointerup', event); return; }
     if (gesture.kind === 'hand') { $wrap().classList.remove('panning'); return; }
     if (gesture.kind === 'zoom-click') {
+      if (gesture.moved) { scheduleRender(); return; }
       const zoomValue = +($('#zoomRange')?.value || 100);
       applyZoom(gesture.alt ? zoomValue - 25 : zoomValue + 25);
       return;
@@ -1338,7 +1360,7 @@
     'tool-lasso': 'Draw around an area to select it · Shift adds · Alt subtracts',
     'tool-wand': 'Click a color to auto-select similar pixels',
     'tool-pen': 'Click to place points, drag for curves · Enter closes the path',
-    'tool-zoom': 'Click zooms in · Alt+click zooms out · double-click fits',
+    'tool-zoom': 'Click zooms in · Alt+click out · drag for scrubby zoom · double-click fits',
     'tool-hand': 'Drag to pan the photo'
   };
 

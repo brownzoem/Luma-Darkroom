@@ -54,10 +54,10 @@
     "dist": "electron-builder --win nsis --x64"
   },
   "devDependencies": {
-    "@electron/asar": "^3.4.1",
-    "electron": "^43.4.0",
+    "@electron/asar": "^4.3.0",
+    "electron": "^43.4.1",
     "electron-builder": "^26.0.12",
-    "eslint": "^9.39.5",
+    "eslint": "^10.9.0",
     "playwright-core": "^1.62.1"
   },
   "build": {

@@ -74,11 +74,25 @@ async function waitForPreview(page) {
     refreshControls();
   });
   await page.click('#presetsPanelTab');
+  const customFilterKey = await page.evaluate(() => CUSTOM_PRESET_FILTER);
+  const customCategoryInitially = await page.locator(`#presetGroups [data-group="${customFilterKey}"]`).count();
+  await page.click('#createCustomPreset');
+  const emptyCreateValidity = await page.locator('#customPresetName').evaluate(element => ({ required: element.required, valid: element.validity.valid, message: element.validationMessage }));
+  await page.click('#customPresetDialog header button[value="cancel"]');
+  await page.locator('#customPresetDialog').waitFor({ state: 'hidden' });
+  const closeButtonCancellation = await page.evaluate(() => ({ count: customPresets.length, returnValue: document.querySelector('#customPresetDialog').returnValue }));
+  await page.click('#createCustomPreset');
+  await page.click('#customPresetDialog .dialog-actions button[value="cancel"]');
+  await page.locator('#customPresetDialog').waitFor({ state: 'hidden' });
+  const cancelButtonCancellation = await page.evaluate(() => ({ count: customPresets.length, returnValue: document.querySelector('#customPresetDialog').returnValue }));
   await page.click('#createCustomPreset');
   await page.locator('#customPresetName').evaluate(element => { element.value = '  Studio\u0000   Warm  '; });
   await page.fill('#customPresetGroup', '  Client   Looks  ');
   await page.click('#saveCustomPreset');
   await page.locator('#customPresetDialog').waitFor({ state: 'hidden' });
+  const customCategoryButton = page.locator(`#presetGroups [data-group="${customFilterKey}"]`);
+  await customCategoryButton.click();
+  const customCategoryAfterCreate = await page.evaluate(() => ({ labels: [...document.querySelectorAll('#presetGroups button')].map(button => button.textContent), active: document.querySelector('#presetGroups .active')?.textContent, cards: document.querySelectorAll('#presetGrid .preset').length, customCards: document.querySelectorAll('#presetGrid .custom-preset').length, builtInCards: document.querySelectorAll('#presetGrid .preset-entry:not(.custom-preset)').length }));
 
   const defaultScope = await page.evaluate(() => {
     const preset = customPresets[0], stored = JSON.parse(localStorage.getItem(CUSTOM_PRESET_KEY));
@@ -165,6 +179,8 @@ async function waitForPreview(page) {
   await page.click('#saveCustomPreset');
   await page.locator('#customPresetDialog').waitFor({ state: 'hidden' });
   const scoped = await page.evaluate(() => { const preset = customPresets.find(item => item.name === 'Scoped Look'); return { id: preset.id, include: preset.includePhotoSettings, exposure: preset.patch.light.exposure, wb: preset.patch.color.wb, temperature: preset.patch.color.temperature, tint: preset.patch.color.tint }; });
+  await page.click(`#presetGroups [data-group="${customFilterKey}"]`);
+  const customCategoryAfterSecond = await page.evaluate(() => ({ cards: document.querySelectorAll('#presetGrid .preset').length, customCards: document.querySelectorAll('#presetGrid .custom-preset').length, groups: [...document.querySelectorAll('#presetGrid .custom-preset .preset span')].map(item => item.textContent) }));
 
   await page.fill('#presetSearch', 'studio warm');
   const search = await page.evaluate(() => ({ cards: document.querySelectorAll('#presetGrid .preset').length, text: document.querySelector('#presetGrid .preset b')?.textContent }));
@@ -176,9 +192,16 @@ async function waitForPreview(page) {
   await page.click('#saveCustomPreset');
   await page.locator('#customPresetDialog').waitFor({ state: 'hidden' });
   await page.click('#presetGroups [data-group="All"]');
+  await page.locator('#presetAmount').evaluate(element => { element.value = '100'; element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); });
+  await page.click(`[data-preset-key="custom:${scoped.id}"]`);
+  const beforeSavedDelete = await page.evaluate(() => ({ editsJson: JSON.stringify(current.edits), baseJson: JSON.stringify(presetBase), activeName: activePreset?.name, removable: !document.querySelector('#removeAppliedPreset').disabled, deleteText: document.querySelector(`[data-delete-preset="${activePreset.id}"]`)?.textContent.trim() }));
   await page.click(`[data-delete-preset="${scoped.id}"]`);
+  const deleteConfirmation = await page.evaluate(() => ({ title: document.querySelector('#deletePresetTitle').textContent, summary: document.querySelector('#deletePresetSummary').textContent, action: document.querySelector('#confirmDeletePreset').textContent }));
   await page.click('#confirmDeletePreset');
   await page.locator('#deletePresetDialog').waitFor({ state: 'hidden' });
+  const afterSavedDelete = await page.evaluate(() => ({ editsJson: JSON.stringify(current.edits), activeName: activePreset?.name, tracked: !!presetBase, removable: !document.querySelector('#removeAppliedPreset').disabled, savedCardRemaining: !!document.querySelector(`[data-preset-key="custom:${activePreset?.id}"]`), status: document.querySelector('#appliedPresetStatus').textContent }));
+  await page.click('#removeAppliedPreset');
+  const removedAfterSavedDelete = await page.evaluate(() => ({ editsJson: JSON.stringify(current.edits), active: !!activePreset, tracked: !!presetBase, removable: !document.querySelector('#removeAppliedPreset').disabled }));
   const managed = await page.evaluate(() => ({ count: customPresets.length, names: customPresets.map(item => item.name), storageCount: JSON.parse(localStorage.getItem(CUSTOM_PRESET_KEY)).presets.length }));
 
   const importDefense = await page.evaluate(() => {
@@ -199,20 +222,27 @@ async function waitForPreview(page) {
   app = null;
   app = await electron.launch(launchOptions());
   page = await livePage(app, errors);
-  const restart = await page.evaluate(() => ({ names: customPresets.map(item => item.name), count: customPresets.length, recoveryRemaining: !!localStorage.getItem(CUSTOM_PRESET_RECOVERY_KEY), visibleCount: document.querySelectorAll('#presetGrid .custom-preset').length }));
+  const restart = await page.evaluate(() => ({ names: customPresets.map(item => item.name), count: customPresets.length, recoveryRemaining: !!localStorage.getItem(CUSTOM_PRESET_RECOVERY_KEY), visibleCount: document.querySelectorAll('#presetGrid .custom-preset').length, customCategory: [...document.querySelectorAll('#presetGroups button')].some(button => button.textContent === 'Custom' && button.dataset.group === CUSTOM_PRESET_FILTER) }));
 
   if (defaultScope.count !== 1 || defaultScope.name !== 'Studio Warm' || defaultScope.group !== 'Client Looks' || defaultScope.includePhotoSettings || ['geometry','cleanup','masks','retouch'].some(key => defaultScope.topKeys.includes(key)) || defaultScope.lightKeys.includes('exposure') || ['wb','temperature','tint'].some(key => defaultScope.colorKeys.includes(key)) || defaultScope.contrast !== 37 || defaultScope.vibrance !== 22 || defaultScope.pointVisualize || defaultScope.storedType !== 'custom-presets-local' || defaultScope.storedCount !== 1 || defaultScope.recoveryRemaining) failures.push('Default custom-preset capture, sanitization, scope, or atomic local save failed');
+  if (!emptyCreateValidity.required || emptyCreateValidity.valid || !emptyCreateValidity.message || closeButtonCancellation.count !== 0 || closeButtonCancellation.returnValue !== 'cancel' || cancelButtonCancellation.count !== 0 || cancelButtonCancellation.returnValue !== 'cancel') failures.push('An empty required preset name blocked Close or Cancel, or cancellation created a preset');
+  if (customCategoryInitially !== 0 || !customCategoryAfterCreate.labels.includes('Custom') || customCategoryAfterCreate.active !== 'Custom' || customCategoryAfterCreate.cards !== 1 || customCategoryAfterCreate.customCards !== 1 || customCategoryAfterCreate.builtInCards !== 0) failures.push('The Custom category did not appear only after a custom preset existed or included built-in presets');
   if (applied.exposure !== .44 || applied.contrast !== 37 || applied.wb !== 'Tungsten' || applied.temperature !== -35 || applied.tint !== -2 || applied.rotate !== -9 || applied.cropZoom !== 118 || applied.cleanupKind !== 'clone' || applied.maskId !== 'base-mask' || applied.pointId !== 'captured-color' || applied.history !== 1 || applied.historyLabel !== 'Preset: Studio Warm') failures.push('Custom preset did not preserve excluded photo-specific state or create exactly one undo transaction');
   if (undone.contrast !== -9 || undone.pointId !== 'base-color' || undone.undo !== 0 || undone.redo !== 1) failures.push('Custom preset undo did not restore the exact base state');
   if (Math.abs(amount50.contrast - 14) > .001 || amount50.history !== 1 || amount0.contrast !== -9 || amount0.pointId !== 'base-color' || amount0.history !== 1) failures.push('Custom preset amount did not blend from the original base or keep nonnumeric arrays inert at zero');
   if (!scoped.include || scoped.exposure !== 1.8 || scoped.wb !== 'Daylight' || scoped.temperature !== 8 || scoped.tint !== 3) failures.push('Explicit exposure and white-balance capture option failed');
+  if (customCategoryAfterSecond.cards !== 2 || customCategoryAfterSecond.customCards !== 2 || !customCategoryAfterSecond.groups.some(group => group.startsWith('Client Looks')) || !customCategoryAfterSecond.groups.some(group => group.startsWith('User'))) failures.push('The Custom category did not aggregate custom presets from every user group');
   if (search.cards !== 1 || search.text !== 'Studio Warm') failures.push('Custom preset search failed');
+  if (beforeSavedDelete.activeName !== 'Scoped Look' || !beforeSavedDelete.removable || beforeSavedDelete.deleteText !== 'Delete saved') failures.push('Saved-preset deletion was not visibly distinct from removing its applied look');
+  if (deleteConfirmation.title !== 'Delete saved preset?' || !deleteConfirmation.summary.includes('does not change photos') || deleteConfirmation.action !== 'Delete saved preset') failures.push('Saved-preset delete confirmation did not explain its scope');
+  if (afterSavedDelete.editsJson !== beforeSavedDelete.editsJson || afterSavedDelete.activeName !== 'Scoped Look' || !afterSavedDelete.tracked || !afterSavedDelete.removable || afterSavedDelete.savedCardRemaining || !afterSavedDelete.status.includes('Scoped Look')) failures.push('Deleting a saved preset changed the current photo or lost its removable applied state');
+  if (removedAfterSavedDelete.editsJson !== beforeSavedDelete.baseJson || removedAfterSavedDelete.active || removedAfterSavedDelete.tracked || removedAfterSavedDelete.removable) failures.push('An applied look could not be removed after its saved custom preset was deleted');
   if (managed.count !== 1 || managed.names.join(',') !== 'Renamed Warm' || managed.storageCount !== 1) failures.push('Custom preset rename/delete or autosave failed');
   if (importDefense.result.added !== 1 || importDefense.result.updated !== 0 || importDefense.result.skipped !== 1 || importDefense.conflictResult.added !== 1 || importDefense.conflictResult.updated !== 0 || importDefense.conflictResult.conflicts !== 1 || importDefense.count !== 3 || !importDefense.blocked || !importDefense.prototypeClean || importDefense.exportType !== 'custom-presets' || importDefense.exportCount !== 3 || importDefense.forbidden || importDefense.originalName !== 'Renamed Warm' || importDefense.originalContrast !== 37 || !importDefense.copyIdChanged || importDefense.copyContrast !== 99 || importDefense.backupType !== 'custom-presets-local' || importDefense.backupCount !== 2 || !importDefense.backupHasOriginal || !importDefense.backupHasSafe) failures.push('Custom preset import/export conflict recovery or defense-in-depth failed');
-  if (restart.count !== 3 || !restart.names.includes('Renamed Warm') || !restart.names.includes('Imported Safe') || !restart.names.includes('Collision Copy') || restart.recoveryRemaining || restart.visibleCount !== 3) failures.push('Custom presets failed process-restart persistence');
+  if (restart.count !== 3 || !restart.names.includes('Renamed Warm') || !restart.names.includes('Imported Safe') || !restart.names.includes('Collision Copy') || restart.recoveryRemaining || restart.visibleCount !== 3 || !restart.customCategory) failures.push('Custom presets or their Custom category failed process-restart persistence');
   if (errors.length) failures.push('Renderer emitted unexpected errors');
 
-  process.stdout.write(`${JSON.stringify({ defaultScope, applied, undone, amount50, amount0, scoped, search, managed, importDefense, restart, errors, failures }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ emptyCreateValidity, closeButtonCancellation, cancelButtonCancellation, customCategoryInitially, customCategoryAfterCreate, defaultScope, applied, undone, amount50, amount0, scoped, customCategoryAfterSecond, search, beforeSavedDelete, deleteConfirmation, afterSavedDelete, removedAfterSavedDelete, managed, importDefense, restart, errors, failures }, null, 2)}\n`);
   if (failures.length) process.exitCode = 1;
 })().catch(error => {
   console.error(error);

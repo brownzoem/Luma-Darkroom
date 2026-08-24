@@ -6,9 +6,9 @@
  *
  *   - 8 crop handles resize the rectangle (aspect presets lock the ratio,
  *     X swaps orientation, Shift temporarily locks the current ratio).
- *   - Dragging INSIDE the rectangle pans the photo underneath the crop
- *     (Lightroom behavior); holding Ctrl moves the rectangle itself.
- *   - Dragging OUTSIDE the rectangle rotates (straighten).
+ *   - Dragging anywhere on the photo pans it underneath the crop; holding
+ *     Ctrl while starting inside the rectangle moves the rectangle itself.
+ *   - Straightening is adjusted with the explicit precision control.
  *   - The photo's own frame shows round handles: corners zoom the photo
  *     in/out, edge midpoints stretch (distort) it horizontally/vertically.
  *   - A shape can be applied to the crop (oval, star, heart, …, or the
@@ -48,7 +48,8 @@
     shapePoints: [],
     guides: 'thirds',
     gesture: null,
-    handleCache: ''
+    handleCache: '',
+    orientationPair: null
   };
 
   const rail = globalThis.LumaToolRail;
@@ -88,6 +89,7 @@
     crop.shapePoints = E.clone(geometry.cropShapePoints || []);
     crop.ratio = null;
     crop.ratioLabel = 'Free';
+    crop.orientationPair = null;
 
     // Show the full frame while cropping.
     geometry.cropL = 0; geometry.cropT = 0; geometry.cropR = 1; geometry.cropB = 1;
@@ -100,9 +102,13 @@
   }
 
   function finishState() {
+    const gesture = crop.gesture;
+    if (gesture?.kind === 'photo') rail.endCanvasWarp(gesture);
+    $('#canvas')?.closest('.canvas-wrap')?.classList.remove('panning');
     crop.active = false;
     crop.gesture = null;
     crop.handleCache = '';
+    crop.orientationPair = null;
     $handles()?.classList.add('hidden');
   }
 
@@ -216,6 +222,7 @@
       rail.requestDraft();
     }, 'Straighten', 0.1);
     straighten.id = 'cropStraightenRange';
+    straighten.title = 'Adjust rotation precisely; dragging the photograph pans it.';
     bar.append(straighten);
 
     bar.append(miniButton('Guides: ' + crop.guides, 'Cycle guide overlay (O)', () => { cycleGuides(); renderCropOptions(); }));
@@ -255,6 +262,7 @@
   }
 
   function applyAspect(label) {
+    crop.orientationPair = null;
     crop.ratioLabel = label;
     const entry = RATIOS.find(([name]) => name === label);
     if (!entry || entry[1] == null) { crop.ratio = null; return; }
@@ -293,21 +301,56 @@
   }
 
   function swapOrientation() {
-    if (crop.ratio) { crop.ratio = 1 / crop.ratio; reshapeToRatio(); renderCropOptions(); return; }
-    const rect = normalizedRect();
+    const before = orientationState(), pair = crop.orientationPair;
+    if (pair && sameOrientationState(before, pair[0])) { installOrientationState(pair[1]); renderCropOptions(); return; }
+    if (pair && sameOrientationState(before, pair[1])) { installOrientationState(pair[0]); renderCropOptions(); return; }
+    const ratio = crop.ratio ? 1 / crop.ratio : null;
+    const after = { rect: transposedRect(before.rect), ratio, ratioLabel: swappedRatioLabel(crop.ratioLabel, ratio) };
+    crop.orientationPair = [before, after];
+    installOrientationState(after);
+    renderCropOptions();
+  }
+
+  function orientationState() {
+    return { rect: { ...normalizedRect() }, ratio: crop.ratio, ratioLabel: crop.ratioLabel };
+  }
+
+  function sameOrientationState(a, b) {
+    if (!a || !b || a.ratio == null !== (b.ratio == null)) return false;
+    if (a.ratio != null && Math.abs(a.ratio - b.ratio) > 1e-10) return false;
+    return ['l', 't', 'r', 'b'].every(key => Math.abs(a.rect[key] - b.rect[key]) <= 1e-10);
+  }
+
+  function installOrientationState(state) {
+    crop.rect = { ...state.rect };
+    crop.ratio = state.ratio;
+    crop.ratioLabel = state.ratioLabel;
+    crop.handleCache = '';
+  }
+
+  function swappedRatioLabel(label, ratio) {
+    if (!ratio || label === 'Free' || label === 'Original') return label;
+    return RATIOS.find(([, value]) => typeof value === 'number' && Math.abs(value - ratio) <= 1e-10)?.[0] || label;
+  }
+
+  function transposedRect(rect) {
     const centerX = (rect.l + rect.r) / 2, centerY = (rect.t + rect.b) / 2;
     const dims = frameDims();
     const widthPx = (rect.r - rect.l) * dims.width, heightPx = (rect.b - rect.t) * dims.height;
-    let halfW = heightPx / dims.width / 2, halfH = widthPx / dims.height / 2;
-    const scaleDown = Math.min(1, 0.5 / Math.max(halfW, halfH), centerX / halfW, (1 - centerX) / halfW, centerY / halfH, (1 - centerY) / halfH);
-    halfW *= scaleDown; halfH *= scaleDown;
-    crop.rect = { l: centerX - halfW, t: centerY - halfH, r: centerX + halfW, b: centerY + halfH };
+    let width = heightPx / dims.width, height = widthPx / dims.height;
+    const scaleDown = Math.min(1, 1 / Math.max(width, 1e-10), 1 / Math.max(height, 1e-10));
+    width *= scaleDown; height *= scaleDown;
+    let left = centerX - width / 2, top = centerY - height / 2;
+    left = Math.max(0, Math.min(1 - width, left));
+    top = Math.max(0, Math.min(1 - height, top));
+    return { l: left, t: top, r: left + width, b: top + height };
   }
 
   function resetRect() {
     crop.rect = { l: 0, t: 0, r: 1, b: 1 };
     crop.ratio = null;
     crop.ratioLabel = 'Free';
+    crop.orientationPair = null;
     if (current) { current.edits.geometry.straighten = 0; rail.requestDraft(); }
     renderCropOptions();
   }
@@ -408,35 +451,24 @@
     const photoHandle = photoHandlePositions().find(handle => Math.hypot(px - handle.sx, py - handle.sy) <= 12);
     if (photoHandle) { beginPhotoGesture(event, photoHandle.kind, screen); return true; }
 
-    // Inside the crop box, dragging pans the PHOTO under the crop; Ctrl moves the box itself.
+    // A normal drag anywhere on the visible photo pans it under the crop. The
+    // dimmed margin is still photograph content, not an implicit rotate zone.
+    // Ctrl keeps its existing, explicit crop-box move behavior when the drag
+    // starts inside the crop.
     const inside = px >= screen.x && px <= screen.x + screen.w && py >= screen.y && py <= screen.y + screen.h;
     if (inside && event.ctrlKey) { beginRectGesture(event, 'move', screen); return true; }
-    if (inside) { beginPhotoGesture(event, 'photo-pan', screen); return true; }
-    beginStraightenGesture(event, screen);
+    beginPhotoGesture(event, 'photo-pan', screen);
     return true;
   }
 
   function beginRectGesture(event, part, screen) {
+    crop.orientationPair = null;
     crop.gesture = {
       kind: 'rect', part, pointerId: event.pointerId,
       startX: event.clientX, startY: event.clientY,
       startRect: { ...normalizedRect() }, screen,
       shiftRatio: null
     };
-    bindWindowGesture();
-  }
-
-  function beginStraightenGesture(event, screen) {
-    const centerX = screen.display.left + screen.x + screen.w / 2;
-    const centerY = screen.display.top + screen.y + screen.h / 2;
-    crop.gesture = {
-      kind: 'straighten', pointerId: event.pointerId,
-      centerX, centerY,
-      startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
-      startStraighten: current.edits.geometry.straighten,
-      before: E.clone(current.edits), photoId: current.id, moved: false
-    };
-    rail.beginCanvasWarp(crop.gesture);
     bindWindowGesture();
   }
 
@@ -459,6 +491,7 @@
       before: E.clone(current.edits), photoId: current.id, moved: false
     };
     rail.beginCanvasWarp(crop.gesture);
+    if (part === 'photo-pan') $('#canvas')?.closest('.canvas-wrap')?.classList.add('panning');
     bindWindowGesture();
   }
 
@@ -492,7 +525,6 @@
     if (!gesture || event.pointerId !== gesture.pointerId) return;
     event.preventDefault();
     if (gesture.kind === 'rect') { moveRectGesture(event, gesture); return; }
-    if (gesture.kind === 'straighten') { moveStraightenGesture(event, gesture); return; }
     if (gesture.kind === 'photo') { movePhotoGesture(event, gesture); return; }
   }
 
@@ -500,7 +532,8 @@
     const gesture = crop.gesture;
     if (!gesture || event.pointerId !== gesture.pointerId) return;
     crop.gesture = null;
-    if (gesture.kind === 'straighten' || gesture.kind === 'photo') {
+    $('#canvas')?.closest('.canvas-wrap')?.classList.remove('panning');
+    if (gesture.kind === 'photo') {
       rail.cancelPendingDraft();
       rail.endCanvasWarp(gesture);
       if (gesture.moved && current?.id === gesture.photoId) {
@@ -594,24 +627,6 @@
     const start = gesture.startRect;
     gesture.shiftRatio = ((start.r - start.l) * dims.width) / Math.max(1e-6, (start.b - start.t) * dims.height);
     return gesture.shiftRatio;
-  }
-
-  function moveStraightenGesture(event, gesture) {
-    const angle = Math.atan2(event.clientY - gesture.centerY, event.clientX - gesture.centerX);
-    let degrees = gesture.startStraighten + (angle - gesture.startAngle) * 180 / Math.PI;
-    degrees = Math.max(-45, Math.min(45, degrees));
-    current.edits.geometry.straighten = Math.round(degrees * 10) / 10;
-    gesture.moved = true;
-    catalogDirty = true;
-    const delta = (current.edits.geometry.straighten - gesture.startStraighten) * Math.PI / 180;
-    const painted = rail.drawCanvasWarp(gesture, (context, canvas) => {
-      context.translate(canvas.width / 2, canvas.height / 2);
-      context.rotate(delta);
-      context.translate(-canvas.width / 2, -canvas.height / 2);
-    });
-    if (!painted) rail.requestDraft();
-    const slider = $('#cropStraightenRange');
-    if (slider) slider.value = String(current.edits.geometry.straighten);
   }
 
   function movePhotoGesture(event, gesture) {
@@ -810,6 +825,7 @@
     if (lower === 'o') { cycleGuides(); renderCropOptions(); return true; }
     if (lower === 'x') { swapOrientation(); return true; }
     if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(lower) && document.activeElement === $('#canvas')) {
+      crop.orientationPair = null;
       const step = event.shiftKey ? 0.05 : 0.01;
       const dx = lower === 'arrowleft' ? -step : lower === 'arrowright' ? step : 0;
       const dy = lower === 'arrowup' ? -step : lower === 'arrowdown' ? step : 0;
@@ -843,7 +859,7 @@
     state: crop,
     isActive: () => crop.active,
     enter, apply, cancel,
-    setRect(l, t, r, b) { crop.rect = { l, t, r, b }; },
+    setRect(l, t, r, b) { crop.rect = { l, t, r, b }; crop.orientationPair = null; },
     setShape,
     setAspect: applyAspect
   };

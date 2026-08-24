@@ -85,6 +85,7 @@ dialog:not(.tutorial-dialog){max-height:calc(100vh - 28px);overflow:auto}dialog 
 
 /* Local custom-preset management stays compact inside the existing Presets tab. */
 .preset-manager{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:9px}.preset-manager button,.preset-actions button{border:1px solid var(--line);border-radius:5px;background:#252a2f;padding:6px 4px;font-size:9px}.preset-manager button:disabled{opacity:.35;cursor:default}.preset-manager span{grid-column:1/-1;color:var(--muted);font-size:9px;text-align:right}.preset-entry{min-width:0}.preset-entry>.preset{width:100%}.preset.active{outline:2px solid var(--accent);outline-offset:1px}.custom-preset>.preset{border-bottom-left-radius:0;border-bottom-right-radius:0}.preset-actions{display:grid;grid-template-columns:1fr 1fr}.preset-actions button{border-top:0;border-radius:0;padding:5px}.preset-actions button:first-child{border-bottom-left-radius:6px}.preset-actions button:last-child{border-bottom-right-radius:6px;color:#ff9ca3}.preset-empty{grid-column:1/-1;color:var(--muted);font-size:10px;line-height:1.5;text-align:center;padding:18px 8px}.preset-scope{display:flex;align-items:center;gap:8px}.preset-scope>input{width:auto!important;margin:0!important;accent-color:var(--accent)}.preset-scope-note{color:var(--muted);font-size:10px;line-height:1.45}.danger-button{border:1px solid #9b444c;border-radius:7px;background:#7c3038;color:#fff;padding:8px 13px;font-weight:600}.danger-button:hover{background:#963b45}
+.preset-applied-row{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-top:7px}.preset-applied-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:9px}.preset-applied-row button{flex:none;border:1px solid #6a4e53;border-radius:5px;background:#2b2427;color:#ffb5b8;padding:6px 8px;font-size:9px}.preset-applied-row button:disabled{border-color:var(--line);background:#222629;color:#667079;cursor:default}
 
 /* ============================================================================
    Tool rail, options bar, selection overlays, and crop tool (v3.0)
@@ -139,7 +140,7 @@ dialog:not(.tutorial-dialog){max-height:calc(100vh - 28px);overflow:auto}dialog 
 /* --- Per-tool canvas cursors --- */
 #canvas[data-tool="tool-marquee"],#canvas[data-tool="tool-lasso"],#canvas[data-tool="tool-wand"],#canvas[data-tool="tool-pen"]{cursor:crosshair}
 #canvas[data-tool="tool-move"]{cursor:move}
-#canvas[data-tool="tool-crop"]{cursor:crosshair}
+#canvas[data-tool="tool-crop"]{cursor:grab}
 #canvas[data-tool="tool-hand"]{cursor:grab}
 #canvas[data-tool="tool-zoom"]{cursor:zoom-in}
 
@@ -194,5 +195,68 @@ dialog:not(.tutorial-dialog){max-height:calc(100vh - 28px);overflow:auto}dialog 
 .mask-row.drop-before::before{content:'';position:absolute;left:2px;right:2px;top:-2px;height:2.5px;border-radius:2px;background:var(--accent)}
 .mask-row.drop-after::after{content:'';position:absolute;left:2px;right:2px;bottom:-2px;height:2.5px;border-radius:2px;background:var(--accent)}
 
+/* Editable mask tree: one primary target, secondary multi-selection, groups,
+   and explicit boolean component modes. Gestures always have button/menu paths. */
+.mask-selection-bar{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,.78fr);gap:5px;align-items:center;margin:4px 0 7px;padding:7px;border:1px solid #38577a;border-radius:8px;background:#192638}
+.mask-selection-bar>span{grid-column:1/-1;color:#bdd5f5;font-size:10px;font-weight:650;letter-spacing:.02em}
+.mask-selection-bar button{min-width:0;border:1px solid #405b7b;border-radius:5px;background:#24364d;color:#e8f2ff;padding:6px 7px;font-size:10px;white-space:nowrap}
+.mask-selection-bar button:hover,.mask-selection-bar button:focus-visible{background:#304965;border-color:#6d96c5}
+.mask-selection-bar .danger-quiet{color:#ffb1b7;border-color:#70464c;background:#3a272d}
+.mask-combine-wrap{position:relative;min-width:0}
+.mask-combine-wrap>button{width:100%}
+.mask-combine-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:60;width:220px;padding:5px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);box-shadow:0 14px 38px #000c}
+.mask-combine-menu button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;border:0;background:transparent;text-align:left;padding:7px 8px}
+.mask-combine-menu button span{color:var(--muted);font-size:9.5px;white-space:normal}
+.mask-list{gap:3px}
+.mask-row{min-height:40px;gap:5px;padding:4px 4px 4px calc(3px + var(--mask-indent,0px));border-color:#343b42;background:#1f2327;transition:background .1s,border-color .1s,box-shadow .1s}
+.mask-row:hover{background:#252a2f}
+.mask-row.selected{background:#233044;border-color:#466788}
+.mask-row.secondary-selected{box-shadow:inset 3px 0 #6794c4}
+.mask-row.active{background:#302b35;border-color:#d58579;box-shadow:inset 3px 0 #f08a74}
+.mask-row.active.selected{background:linear-gradient(90deg,#392c34,#273242)}
+.mask-row.mask-group-row{font-weight:600;background:#25292e}
+.mask-row.mask-group-row.selected{background:#273448}
+.mask-row.mask-child-row::before{content:'';position:absolute;left:calc(6px + var(--mask-indent,14px) - 14px);top:-4px;bottom:-4px;width:1px;background:#3a4652;pointer-events:none}
+.mask-disclosure{width:17px!important;height:24px!important;flex:0 0 17px!important;padding:0!important;border:0!important;background:transparent!important;color:#aeb8c2!important;font-size:13px!important;line-height:1!important}
+.mask-disclosure[disabled]{visibility:hidden}
+.mask-eye{width:22px!important;height:25px!important;flex:0 0 22px!important;padding:0!important;font-size:10px!important}
+.mask-row .mask-thumb{width:36px;height:28px;flex:0 0 36px}
+.mask-row.mask-group-row .mask-thumb{border-radius:5px;border-color:#596674;box-shadow:inset 0 0 0 1px #0006}
+.mask-row-label{min-width:0}
+.mask-combine-badge{width:24px!important;height:24px!important;flex:0 0 24px!important;padding:0!important;border:1px solid #4b5d70!important;border-radius:5px!important;background:#222d39!important;color:#b9d8ff!important;font-size:13px!important}
+.mask-combine-badge:hover:not([disabled]){background:#30465e!important}
+.mask-combine-badge[disabled]{opacity:.55;cursor:default}
+.mask-row-more{width:24px!important;height:24px!important;padding:0!important}
+
 /* --- Live RGB readout in the canvas toolbar --- */
 .pixel-readout{font:500 11.5px/1 "IBM Plex Mono",Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--muted);min-width:118px;text-align:left;letter-spacing:.02em}
+
+/* --- Exact numeric entry and middle-button precision scrubbing --- */
+.has-precision-input.control{padding:3px 0}
+.range-precision-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;margin-bottom:0}
+.range-precision-heading label{min-width:0;flex:1;margin:0!important}
+.range-passive-output{display:none!important}
+.range-number{width:58px!important;min-width:58px;height:22px;padding:2px 5px;border:1px solid #66737f;border-radius:5px;background:#23282c!important;color:var(--text);text-align:right;font:500 11px/1.2 "IBM Plex Mono",Consolas,monospace;font-variant-numeric:tabular-nums;appearance:auto}
+.range-number:hover{border-color:#84919d}
+.range-number:focus-visible{border-color:var(--accent);outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:1px}
+.range-number[aria-invalid=true]{border-color:var(--danger);background:#3a2328!important}
+.range-precision-inline{display:inline-flex!important;align-items:center;gap:6px;width:auto!important;min-width:0}
+.range-precision-inline>input[type=range]{flex:1;min-width:52px}
+.control input[type=range]{height:18px}
+.preset-top .range-precision-heading{margin:1px 0 3px}
+.preset-top .range-precision-heading label{display:block}
+.editor-tools .range-precision-inline{width:auto!important}
+.editor-tools .range-precision-inline>input[type=range]{width:86px}
+.editor-tools .range-number{width:52px!important;min-width:52px}
+.tool-options .range-precision-inline{gap:5px}
+.tool-options .range-number{width:52px!important;min-width:52px;height:23px}
+.gradient-hue .range-number{background:#23282c!important}
+.editor-tools .range-precision-inline+#zoomLabel{display:none}
+.precision-scrubbing-target{outline:2px solid var(--accent)!important;outline-offset:2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+body.precision-scrubbing,body.precision-scrubbing *{cursor:ew-resize!important;user-select:none!important}
+
+@media(max-width:760px){
+  .range-number{width:64px!important;min-width:64px;height:38px}
+  .control input[type=range]{height:32px}
+  .tool-options .range-number,.editor-tools .range-number{width:58px!important;min-width:58px;height:34px}
+}

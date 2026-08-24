@@ -5,6 +5,44 @@ principles, and versions follow Semantic Versioning where practical.
 
 ## Unreleased
 
+## 3.3.0 - 2026-08-24
+
+### Added
+
+- An editable mask tree with multi-row selection, collapsible folders, deep
+  duplication, detach and ungroup commands, and non-destructive Add, Subtract,
+  Intersect, and Difference composites. Every component remains independently
+  editable, and structural changes participate in one-step Undo.
+- Exact numeric entry beside adjustment sliders plus middle-button precision
+  scrubbing, with Shift for finer movement and Ctrl for faster movement.
+- A dedicated Custom preset category when saved presets exist, along with
+  controls to remove an applied preset from a photograph or delete a saved
+  custom-preset recipe.
+
+### Changed
+
+- Mask-tree migration, rendering, preview, and export now share bounded nested
+  evaluation with global ID, depth, leaf, group, stroke, point, and region
+  limits. Preview and export use the same composite-mask result.
+- Mask rows now expose clearer primary and secondary selection, visibility,
+  density, keyboard commands, accessible tree state, and block reordering.
+- Crop straightening is an explicit precision action, so dragging the photo
+  outside a smaller crop continues to pan instead of unexpectedly rotating it.
+- The native-source release builder retries transient downloads and can reuse
+  only SHA-256-verified cached archives, keeping pinned source identities intact
+  when an upstream host is temporarily unavailable.
+
+### Fixed
+
+- Swapping crop orientation repeatedly no longer makes the crop progressively
+  smaller.
+- Canceling the custom-preset dialog no longer triggers required-name
+  validation.
+- Starting a Pen selection and then choosing another tool now cancels the
+  unfinished vector draft, tether, and stale Enter/double-click behavior.
+- Preset management now distinguishes removing a look from the current photo
+  from deleting the reusable custom-preset recipe.
+
 ## 3.2.0 - 2026-08-21
 
 ### Added

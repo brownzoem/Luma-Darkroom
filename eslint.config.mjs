@@ -31,14 +31,14 @@ const appIntegrationGlobals = {
   toolMode: 'readonly', spacePanActive: 'readonly',
   MAX_MASK_LAYERS: 'readonly', BRUSH_TOOLS: 'readonly', RETOUCH_TOOLS: 'readonly',
   GRADIENT_TOOLS: 'readonly', POINT_TOOLS: 'readonly',
-  activeMask: 'readonly', maskById: 'readonly', activateMaskBrush: 'readonly', addMaskAndActivate: 'readonly',
+  activeMask: 'readonly', maskById: 'readonly', maskLeafCount: 'readonly', activateMaskBrush: 'readonly', addMaskAndActivate: 'readonly',
   beginSmartObjectSelection: 'readonly', commit: 'readonly', pushHistory: 'readonly',
   refreshControls: 'readonly', scheduleRender: 'readonly', debounceSave: 'readonly',
   switchRightPanel: 'readonly', toast: 'readonly', uid: 'readonly',
   uniqueMaskName: 'readonly', clearPresetTracking: 'readonly', applyZoom: 'readonly',
   openHelpCenter: 'readonly', remapEditPoints: 'readonly',
   // Bindings the tool layer intentionally reassigns (monkey-patch pattern).
-  setTool: 'writable', catalogDirty: 'writable'
+  setTool: 'writable', catalogDirty: 'writable', maskSelectedIds: 'writable', maskSelectionAnchorId: 'writable'
 };
 
 export default [

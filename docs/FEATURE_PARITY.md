@@ -27,7 +27,7 @@ size and SHA-256, and run locally; photographs are not uploaded for selection.
 | Fringe color reduction | Limited | Purple and green fringe-hue reduction; no spatial channel realignment. |
 | Geometric corrections | Limited | Manual vertical, horizontal, rotation, aspect, scale, and offset controls; no automatic line detection. |
 | Camera calibration | Limited | Decoded-RGB primary mixing and shadow tint; it does not replace a camera profile or RAW pipeline. |
-| Crop and straighten | Available | Interactive on-canvas crop with drag handles, aspect presets and lock, drag-to-straighten, guide overlays, rotate, flip, and constrained crop. |
+| Crop and straighten | Available | Interactive on-canvas crop with drag handles, aspect presets and lock, precision straighten controls, guide overlays, rotate, flip, and constrained crop. |
 | Shape crops | Available | Oval, rounded, star, heart, polygon, arrow, and selection-outline crop shapes with feathered edges; PNG/WebP/TIFF exports keep the transparency and JPEG flattens to white. |
 | Photo transform inside crop | Available | Drag the photo under the crop to reposition it; corner handles zoom, edge handles stretch/distort, all non-destructive. |
 | Lens blur | Limited | Mask-local inside/outside Gaussian blur; no depth map, focus plane, bokeh-shape simulation, or highlight model. |
@@ -41,7 +41,7 @@ size and SHA-256, and run locally; photographs are not uploaded for selection.
 
 | Capability | Status | Current behavior |
 | --- | --- | --- |
-| Layered masks | Available | Up to eight named, ordered, invertible, duplicable, hideable masks with per-layer opacity and independent local edits. |
+| Layered masks | Available | An editable mask tree with multi-select rows, one primary target, collapsible folders, deep duplicate, detach, ungroup, visibility, density, reorder, rename, and Add/Subtract/Intersect/Difference composite masks. Components remain editable and Undo restores structural actions. Up to eight mask leaves, eight groups, and four levels. |
 | Freehand and polygonal lasso selections | Available | Single-key lasso tools with marching-ants feedback; selections become editable mask layers with the full local-adjustment set. |
 | Marquee and preset-shape selections | Available | Rectangle, ellipse, and preset shapes (star, heart, polygons, arrow) drawn on canvas with square/from-center modifiers. |
 | Vector pen selections | Available | Click-and-drag cubic-curve paths with editable anchors and handles after closing. |

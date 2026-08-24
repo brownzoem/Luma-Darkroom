@@ -69,9 +69,10 @@ Minimum manual matrix:
   preset shape) with Shift/Alt combine and constrain modifiers, magic wand
   tolerance and contiguous, pen paths with anchor editing, Move/Transform pan
   and corner/edge handles, Ctrl+D / Ctrl+Shift+I, and marching-ants overlay;
-- the crop tool: handles, aspect presets and X swap, drag-outside straighten,
+- the crop tool: handles, aspect presets and X swap, precision straighten,
   guide cycling with O, shape crops (including "From selection") with feather,
-  photo pan/zoom/stretch inside the crop, Enter apply / Esc cancel, and a
+  photo pan from both inside and outside the crop, photo zoom/stretch handles,
+  Enter apply / Esc cancel, and a
   transparent-PNG plus flattened-JPEG shape-crop export;
 - close/relaunch autosave, recovery selection, quota failure, valid backup,
   corrupt backup, duplicate IDs, duplicate paths, and legacy migration;

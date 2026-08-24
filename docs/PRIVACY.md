@@ -9,7 +9,7 @@ or application backend. The page Content Security Policy sets
 network request: downloading a user-approved local selection model from fixed,
 allowlisted HTTPS URLs.
 
-This document describes the inspected 2.4.0 source. It is not a warranty,
+This document describes the inspected 3.3.0 source. It is not a warranty,
 privacy certification, or promise about modified builds, operating systems,
 package registries, hosting platforms, or other software.
 

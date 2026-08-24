@@ -78,7 +78,7 @@
     { id: 'wand', key: 'W', name: 'Auto select (wand)', hint: 'Click a color to select similar pixels. Adjust tolerance in the bar above.', mode: 'tool-wand' },
     { id: 'pen', key: 'P', name: 'Pen (vector select)', hint: 'Click for corners, drag for curves. Click the first point or press Enter to close.', mode: 'tool-pen' },
     { id: 'brush', key: 'B', name: 'Mask brush', mode: 'mask-add', activate: () => { switchRightPanel('mask'); activateMaskBrush('mask-add', { force: true }); } },
-    { id: 'eraser', key: 'E', name: 'Mask eraser', mode: 'mask-subtract', activate: () => { if (!activeMask()) { toast('Create or choose a mask before using the Eraser'); return; } switchRightPanel('mask'); setTool('mask-subtract', { force: true }); } },
+    { id: 'eraser', key: 'E', name: 'Mask eraser', mode: 'mask-subtract', activate: () => { if (!activeMask()) { toast('Create or choose a mask before using the Eraser'); return; } switchRightPanel('mask'); activateMaskBrush('mask-subtract', { force: true }); } },
     { id: 'gradient', key: 'G', name: 'Gradient mask', mode: 'mask-linear', matches: mode => mode === 'mask-linear' || mode === 'mask-radial', activate: () => activateGradientTool(false) },
     { id: 'crop', key: 'C', name: 'Crop & shape crop', hint: 'Drag the handles. Enter applies, Esc cancels, O cycles guides, X swaps the aspect.', mode: 'tool-crop' },
     { id: 'eyedropper', key: 'I', name: 'Color sampler', mode: 'color', activate: () => setTool('color', { force: true }) },
@@ -148,7 +148,7 @@
     if (!tool || !current || view !== 'edit') return;
     if (cycleVariant) {
       if (id === 'marquee') state.marqueeVariant = state.marqueeVariant === 'rect' ? 'ellipse' : state.marqueeVariant === 'ellipse' ? 'shape' : 'rect';
-      if (id === 'lasso') state.lassoVariant = state.lassoVariant === 'freehand' ? 'polygonal' : 'freehand';
+      if (id === 'lasso') { cancelPending(); state.lassoVariant = state.lassoVariant === 'freehand' ? 'polygonal' : 'freehand'; }
     }
     if (tool.activate) { tool.activate(cycleVariant); return; }
     setTool(tool.mode, { force: true });
@@ -422,7 +422,7 @@
     if (!current) return false;
     const active = activeMask();
     const activeGeometry = active?.type === 'geometry' ? active : null;
-    if (!activeGeometry && current.edits.masks.layers.length >= MAX_MASK_LAYERS) {
+    if (!activeGeometry && maskLeafCount() >= MAX_MASK_LAYERS) {
       toast('A photo can have up to ' + MAX_MASK_LAYERS + ' local masks');
       return false;
     }
@@ -435,6 +435,8 @@
         layer = E.defaultMaskLayer({ id, name: uniqueMaskName('Selection'), type: 'geometry', space: 'source', show: true, feather: 0 });
         current.edits.masks.layers.unshift(layer);
         current.edits.masks.activeId = id;
+        maskSelectedIds = new Set([id]);
+        maskSelectionAnchorId = id;
       }
       layer.enabled = true;
       layer.regions = replacing ? [{ ...region, mode: 'add' }] : [...(layer.regions || []), { ...region, mode }];
@@ -449,7 +451,7 @@
    */
   function addSelectionLayer() {
     if (!current) return null;
-    if (current.edits.masks.layers.length >= MAX_MASK_LAYERS) {
+    if (maskLeafCount() >= MAX_MASK_LAYERS) {
       toast('A photo can have up to ' + MAX_MASK_LAYERS + ' local masks');
       return null;
     }
@@ -458,6 +460,8 @@
       const layer = E.defaultMaskLayer({ id, name: uniqueMaskName('Selection'), type: 'geometry', space: 'source', show: true, feather: 0 });
       current.edits.masks.layers.unshift(layer);
       current.edits.masks.activeId = id;
+      maskSelectedIds = new Set([id]);
+      maskSelectionAnchorId = id;
     }, { render: false });
     switchRightPanel('mask');
     if (!['tool-marquee', 'tool-lasso', 'tool-wand', 'tool-pen'].includes(toolMode)) setTool('tool-lasso', { force: true });
@@ -565,7 +569,7 @@
     const gesture = state.gesture;
     if (toolMode === 'tool-crop' && !gesture) { routeCrop('pointermove', event); return; }
     if (!gesture || event.pointerId !== gesture.pointerId) {
-      if (state.pending && event.target === $canvas()) {
+      if (state.pending && pendingOwnerMode(state.pending) === toolMode && event.target === $canvas()) {
         const fraction = pointerFraction(event);
         const rect = canvasDisplayRect();
         if (fraction && rect) state.pending.hover = { ...fraction, sx: event.clientX - rect.left, sy: event.clientY - rect.top };
@@ -664,7 +668,7 @@
     if (!current || view !== 'edit' || event.target !== $canvas()) return;
     if (toolMode === 'tool-zoom') { consume(event); applyZoom(100); return; }
     if (toolMode === 'tool-crop') { if (routeCrop('dblclick', event)) consume(event); return; }
-    if (state.pending) { consume(event); closePending(); }
+    if (state.pending && pendingOwnerMode(state.pending) === toolMode) { consume(event); closePending(); }
   }
 
   function consume(event) {
@@ -756,6 +760,10 @@
   function cancelPending() {
     state.pending = null;
     state.gesture = state.gesture?.kind === 'pen-drag' ? null : state.gesture;
+  }
+
+  function pendingOwnerMode(pending = state.pending) {
+    return pending?.kind === 'pen' ? 'tool-pen' : pending?.kind === 'polygon' ? 'tool-lasso' : '';
   }
 
   function removeLastPendingPoint() {
@@ -1078,7 +1086,10 @@
   }
   function endCanvasWarp(holder) {
     holder.warp?.bitmap?.close?.();
-    if (holder.warp) holder.warp.bitmap = null;
+    // Detach the holder entirely. If createImageBitmap() is still resolving,
+    // beginCanvasWarp's completion handler now closes that late bitmap instead
+    // of installing it after the gesture has already ended.
+    holder.warp = null;
   }
 
   function strokeAnts(context, path) {
@@ -1170,7 +1181,7 @@
       strokeAnts(context, path);
       drewSomething = true;
     }
-    if (state.pending) { drawPendingPreview(context); drewSomething = true; }
+    if (state.pending && pendingOwnerMode(state.pending) === toolMode) { drawPendingPreview(context); drewSomething = true; }
 
     // Move/Transform frame.
     if (toolMode === 'tool-move') {
@@ -1263,7 +1274,7 @@
   }
 
   function handleToolKeys(event) {
-    if (event.defaultPrevented || keyContextBlocked(event)) return;
+    if (event.defaultPrevented || window.LumaPrecisionControls?.isScrubbing?.() || keyContextBlocked(event)) return;
     for (const handler of state.keyHandlers) {
       if (handler(event)) { event.preventDefault(); return; }
     }
@@ -1282,7 +1293,7 @@
     if (modified || event.altKey) return;
 
     if (key === '?' && !modified) { event.preventDefault(); openHelpCenter(); return; }
-    if (key === 'Enter' && state.pending) { event.preventDefault(); closePending(); return; }
+    if (key === 'Enter' && state.pending && pendingOwnerMode(state.pending) === toolMode) { event.preventDefault(); closePending(); return; }
     if (key === 'Escape' && (state.pending || state.gesture)) { event.preventDefault(); cancelPending(); state.gesture = null; return; }
     if ((key === 'Backspace' || key === 'Delete') && state.pending) { event.preventDefault(); removeLastPendingPoint(); return; }
 
@@ -1303,6 +1314,8 @@
     if (current.edits.masks.activeId) {
       state.lastDeselectedId = current.edits.masks.activeId;
       current.edits.masks.activeId = '';
+      maskSelectedIds = new Set();
+      maskSelectionAnchorId = '';
       refreshControls();
       scheduleRender();
       debounceSave();
@@ -1316,6 +1329,8 @@
     const layer = state.lastDeselectedId ? maskById(state.lastDeselectedId) : null;
     if (!layer) { toast('Nothing to reselect'); return; }
     current.edits.masks.activeId = layer.id;
+    maskSelectedIds = new Set([layer.id]);
+    maskSelectionAnchorId = layer.id;
     refreshControls();
     scheduleRender();
     debounceSave();
@@ -1325,6 +1340,7 @@
   function invertActiveMask() {
     const mask = activeMask();
     if (!mask) { toast('Create or choose a mask to invert'); return; }
+    if (mask.type === 'group' && mask.groupKind === 'folder') { toast('Select a mask or combined-mask group to invert'); return; }
     commit('Invert mask', () => { activeMask().invert = !activeMask().invert; });
     toast(activeMask()?.invert ? 'Mask inverted' : 'Mask invert removed');
   }
@@ -1366,9 +1382,12 @@
 
   const baseSetTool = setTool;
   setTool = function wrappedSetTool(mode, options = {}) {
-    const leavingCrop = toolMode === 'tool-crop' && mode !== 'tool-crop';
+    const previousMode = toolMode;
+    const nextMode = options.force ? mode : previousMode === mode ? '' : mode;
+    const leavingCrop = previousMode === 'tool-crop' && nextMode !== 'tool-crop';
     if (leavingCrop) routeCrop('exit', null);
-    if (!RAIL_TOOL_MODES.includes(mode)) { cancelPending(); }
+    if (state.pending && (nextMode !== previousMode || nextMode !== pendingOwnerMode(state.pending))) cancelPending();
+    if (previousMode === 'tool-pen' && nextMode !== 'tool-pen') state.selectedAnchor = null;
     baseSetTool(mode, options);
     if (toolMode === 'tool-crop') routeCrop('enter', null);
     if (!options.quiet && TOOL_INSTRUCTIONS[toolMode] && !state.instructedTools.has(toolMode)) {

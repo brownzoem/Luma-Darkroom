@@ -6,6 +6,7 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const releaseDir = path.join(root, 'outputs', 'release');
+const cacheDir = path.join(releaseDir, '.native-source-cache');
 const bundleName = `Luma-Darkroom-${pkg.version}-Native-Corresponding-Source`;
 const staging = path.join(releaseDir, bundleName);
 const archive = path.join(releaseDir, `${bundleName}.zip`);
@@ -55,6 +56,37 @@ async function fetchBytes(source) {
   return bytes;
 }
 
+async function fetchBytesWithRetry(source, attempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetchBytes(source);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        process.stderr.write(`${source.file}: download attempt ${attempt} failed; retrying\n`);
+      }
+    }
+  }
+  throw lastError;
+}
+
+async function readVerifiedCache(source, pinned) {
+  try {
+    const bytes = await fs.readFile(path.join(cacheDir, source.file));
+    const hash = sha256(bytes);
+    if (!pinned || bytes.length !== pinned.bytes || hash !== pinned.sha256) {
+      process.stderr.write(`${source.file}: ignoring cache entry with the wrong identity\n`);
+      return null;
+    }
+    process.stdout.write(`${source.file}: using verified local cache\n`);
+    return bytes;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 async function readExpectedManifest() {
   try {
     const manifest = JSON.parse(await fs.readFile(committedManifestPath, 'utf8'));
@@ -73,15 +105,17 @@ async function main() {
   await fs.rm(staging, { recursive: true, force: true });
   await fs.rm(archive, { force: true });
   await fs.mkdir(path.join(staging, 'archives'), { recursive: true });
+  await fs.mkdir(cacheDir, { recursive: true });
 
   const resolved = [];
   for (const source of sources) {
-    const bytes = await fetchBytes(source);
-    const record = { ...source, bytes: bytes.length, sha256: sha256(bytes) };
     const pinned = expected.get(source.file);
+    const bytes = await readVerifiedCache(source, pinned) || await fetchBytesWithRetry(source);
+    const record = { ...source, bytes: bytes.length, sha256: sha256(bytes) };
     if (!bootstrap && (!pinned || pinned.sha256 !== record.sha256 || pinned.bytes !== record.bytes || pinned.url !== record.url)) {
       throw new Error(`${source.file}: source identity differs from third_party/NATIVE_SOURCE_MANIFEST.json`);
     }
+    await fs.writeFile(path.join(cacheDir, source.file), bytes);
     await fs.writeFile(path.join(staging, 'archives', source.file), bytes, { flag: 'wx' });
     resolved.push(record);
     process.stdout.write(`${source.file}: ${bytes.length} bytes ${record.sha256}\n`);

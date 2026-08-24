@@ -1,10 +1,10 @@
 (() => {
-  const EDIT_SCHEMA_VERSION=8;
+  const EDIT_SCHEMA_VERSION=9;
   const COLORS=['red','orange','yellow','green','aqua','blue','purple','magenta'];
   const HUE_CENTERS={red:0,orange:30,yellow:60,green:120,aqua:180,blue:230,purple:275,magenta:320};
   const clone=v=>JSON.parse(JSON.stringify(v));
   const BLOCKED_KEYS=new Set(['__proto__','prototype','constructor']);
-  const MAX_CURVE_POINTS=64,MAX_CLEANUP_SPOTS=200,MAX_MASK_LAYERS=8,MAX_MASK_STROKES=256,MAX_TOTAL_MASK_STROKES=1024,MAX_MASK_POINTS_PER_PATH=4096,MAX_MASK_POINTS_PER_LAYER=8192,MAX_TOTAL_MASK_POINTS=8192,MAX_SEMANTIC_MASK_EDGE=2048,MAX_SEMANTIC_MASK_PIXELS=4_000_000,MAX_CANVAS_EDGE=16384,MAX_CANVAS_PIXELS=50_000_000;
+  const MAX_CURVE_POINTS=64,MAX_CLEANUP_SPOTS=200,MAX_MASK_LAYERS=8,MAX_MASK_GROUPS=8,MAX_MASK_DEPTH=4,MAX_MASK_STROKES=256,MAX_TOTAL_MASK_STROKES=1024,MAX_MASK_POINTS_PER_PATH=4096,MAX_MASK_POINTS_PER_LAYER=8192,MAX_TOTAL_MASK_POINTS=8192,MAX_SEMANTIC_MASK_EDGE=2048,MAX_SEMANTIC_MASK_PIXELS=4_000_000,MAX_CANVAS_EDGE=16384,MAX_CANVAS_PIXELS=50_000_000;
   const MAX_MASK_REGIONS=64,MAX_REGION_POINTS=1200,MAX_TOTAL_REGION_POINTS=12000,MAX_CROP_SHAPE_POINTS=512;
   const SHAPE_KINDS=['rect','rounded','ellipse','triangle','diamond','pentagon','hexagon','star','heart','arrow'];
   const CROP_SHAPE_KINDS=['oval','rounded','triangle','diamond','pentagon','hexagon','star','heart','arrow','path'];
@@ -12,6 +12,7 @@
   function defaultMaskLayer(overrides={}){
     return Object.assign({
       id:'',name:'Mask',enabled:true,type:'subject',purpose:'',space:'source',legacyShape:'',legacySampling:false,x:.5,y:.5,x2:.5,y2:.8,size:35,range:35,feather:55,brushSize:12,brushFeather:55,strokes:[],regions:[],invert:false,opacity:100,flow:100,toneRange:'all',protectTones:false,
+      groupKind:'',combineMode:'add',componentDensity:100,collapsed:false,children:[],
       rangeType:'none',rangeMin:0,rangeMax:100,rangeFeather:10,rangeHue:0,rangeSaturation:50,rangeLuminance:50,rangeAmount:50,semantic:null,
       subjectExposure:0,subjectClarity:0,backgroundExposure:0,backgroundBlur:0,skyExposure:0,skyTemperature:0,
       localContrast:0,localHighlights:0,localShadows:0,localWhites:0,localBlacks:0,localTemperature:0,localTint:0,localHue:0,localSaturation:0,localTexture:0,localClarity:0,localDehaze:0,localSharpness:0,localNoise:0,localMoire:0,localDefringe:0,localGrain:0,localBlur:0,show:true
@@ -50,7 +51,7 @@
     if(path==='profileAmount')return Math.max(0,Math.min(200,n));
     if(path==='mask.size')return Math.max(5,Math.min(90,n));
     if(path==='mask.range'||path==='mask.brushSize')return Math.max(1,Math.min(100,n));
-    if(['mask.feather','mask.brushFeather','mask.backgroundBlur','mask.localBlur','mask.localSharpness','mask.localNoise','mask.localMoire','mask.localDefringe','mask.localGrain','mask.opacity','mask.flow','mask.rangeMin','mask.rangeMax','mask.rangeFeather','mask.rangeSaturation','mask.rangeLuminance','mask.rangeAmount'].includes(path))return Math.max(0,Math.min(100,n));
+    if(['mask.feather','mask.brushFeather','mask.backgroundBlur','mask.localBlur','mask.localSharpness','mask.localNoise','mask.localMoire','mask.localDefringe','mask.localGrain','mask.opacity','mask.componentDensity','mask.flow','mask.rangeMin','mask.rangeMax','mask.rangeFeather','mask.rangeSaturation','mask.rangeLuminance','mask.rangeAmount'].includes(path))return Math.max(0,Math.min(100,n));
     if(path==='mask.rangeHue')return Math.max(0,Math.min(360,n));
     if(path==='mask.localHue')return Math.max(-180,Math.min(180,n));
     if(['mask.localTemperature','mask.localTint','mask.localSaturation','mask.localContrast','mask.localHighlights','mask.localShadows','mask.localWhites','mask.localBlacks','mask.localTexture','mask.localClarity','mask.localDehaze','mask.subjectClarity','mask.skyTemperature'].includes(path))return Math.max(-100,Math.min(100,n));
@@ -193,14 +194,32 @@
     return{kind:kinds.has(raw.kind)?raw.kind:'object',modelId:models.has(raw.modelId)?raw.modelId:'',modelVersion:String(raw.modelVersion||'1').replace(/[^A-Za-z0-9._-]/g,'').slice(0,32)||'1',width,height,bits,categories,threshold:Math.max(1,Math.min(99,Number.isFinite(+raw.threshold)?+raw.threshold:50)),sourceWidth:Math.max(1,Math.min(100000,Math.round(Number(raw.sourceWidth)||width))),sourceHeight:Math.max(1,Math.min(100000,Math.round(Number(raw.sourceHeight)||height)))};
   }
   function sanitizeMaskLayer(raw,index,used,strokeBudget,legacyVersion=5){
-    raw=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};const layer=defaultMaskLayer(),id=safeMaskId(raw.id,index,used);
+    raw=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
+    const depth=Number(strokeBudget.depth)||0;
+    if(raw.type==='group'&&depth<MAX_MASK_DEPTH){
+      if((strokeBudget.groups||0)>=MAX_MASK_GROUPS)return null;
+      strokeBudget.groups=(strokeBudget.groups||0)+1;
+      const layer=defaultMaskLayer(),id=safeMaskId(raw.id,index,used);
+      layer.id=id;layer.name=String(raw.name||('Mask group '+(index+1))).slice(0,60)||('Mask group '+(index+1));layer.type='group';layer.groupKind=raw.groupKind==='folder'?'folder':'composite';layer.collapsed=raw.collapsed===true;
+      if(typeof raw.enabled==='boolean')layer.enabled=raw.enabled;if(typeof raw.invert==='boolean')layer.invert=raw.invert;if(typeof raw.show==='boolean')layer.show=raw.show;
+      for(const key of ['feather','opacity','componentDensity','subjectExposure','subjectClarity','backgroundExposure','backgroundBlur','skyExposure','skyTemperature','localContrast','localHighlights','localShadows','localWhites','localBlacks','localTemperature','localTint','localHue','localSaturation','localTexture','localClarity','localDehaze','localSharpness','localNoise','localMoire','localDefringe','localGrain','localBlur'])if(raw[key]!=null)layer[key]=sanitizeNumber('mask.'+key,raw[key],layer[key]);
+      if(['all','shadows','midtones','highlights'].includes(raw.toneRange))layer.toneRange=raw.toneRange;if(typeof raw.protectTones==='boolean')layer.protectTones=raw.protectTones;
+      const childBudget={...strokeBudget,depth:depth+1};
+      layer.children=(Array.isArray(raw.children)?raw.children:[]).slice(0,MAX_MASK_LAYERS+MAX_MASK_GROUPS).flatMap((child,childIndex)=>{const value=sanitizeMaskLayer(child,childIndex,used,childBudget,legacyVersion);return value?[value]:[]});
+      strokeBudget.count=childBudget.count;strokeBudget.points=childBudget.points;strokeBudget.regionPoints=childBudget.regionPoints;strokeBudget.groups=childBudget.groups;strokeBudget.leaves=childBudget.leaves;
+      if(layer.groupKind==='composite'&&layer.children.length)layer.children[0].combineMode='add';
+      return layer;
+    }
+    if((strokeBudget.leaves||0)>=MAX_MASK_LAYERS)return null;
+    strokeBudget.leaves=(strokeBudget.leaves||0)+1;
+    const layer=defaultMaskLayer(),id=safeMaskId(raw.id,index,used);
     layer.id=id;layer.name=String(raw.name||(({subject:'Object',sky:'Sky',brush:'Brush',linear:'Linear gradient',radial:'Radial gradient',geometry:'Selection'}[raw.type]||'Mask')+' '+(index+1))).slice(0,60)||('Mask '+(index+1));
     if(typeof raw.enabled==='boolean')layer.enabled=raw.enabled;
     if(['subject','object','sky','person','people','background','landscape','range','brush','linear','radial','geometry'].includes(raw.type))layer.type=raw.type;if(['dodge','burn'].includes(raw.purpose))layer.purpose=raw.purpose;
     layer.space=['source','frame'].includes(raw.space)?raw.space:(legacyVersion<4?'frame':'source');
     if(raw.legacyShape==='ellipse-v2')layer.legacyShape='ellipse-v2';if(raw.legacySampling===true||legacyVersion<5)layer.legacySampling=true;
-    for(const key of ['x','y','x2','y2','size','range','feather','brushSize','brushFeather','opacity','flow','rangeMin','rangeMax','rangeFeather','rangeHue','rangeSaturation','rangeLuminance','rangeAmount','subjectExposure','subjectClarity','backgroundExposure','backgroundBlur','skyExposure','skyTemperature','localContrast','localHighlights','localShadows','localWhites','localBlacks','localTemperature','localTint','localHue','localSaturation','localTexture','localClarity','localDehaze','localSharpness','localNoise','localMoire','localDefringe','localGrain','localBlur'])if(raw[key]!=null)layer[key]=sanitizeNumber('mask.'+key,raw[key],layer[key]);
-    if(typeof raw.invert==='boolean')layer.invert=raw.invert;if(typeof raw.show==='boolean')layer.show=raw.show;if(typeof raw.protectTones==='boolean')layer.protectTones=raw.protectTones;
+    for(const key of ['x','y','x2','y2','size','range','feather','brushSize','brushFeather','opacity','componentDensity','flow','rangeMin','rangeMax','rangeFeather','rangeHue','rangeSaturation','rangeLuminance','rangeAmount','subjectExposure','subjectClarity','backgroundExposure','backgroundBlur','skyExposure','skyTemperature','localContrast','localHighlights','localShadows','localWhites','localBlacks','localTemperature','localTint','localHue','localSaturation','localTexture','localClarity','localDehaze','localSharpness','localNoise','localMoire','localDefringe','localGrain','localBlur'])if(raw[key]!=null)layer[key]=sanitizeNumber('mask.'+key,raw[key],layer[key]);
+    if(typeof raw.invert==='boolean')layer.invert=raw.invert;if(typeof raw.show==='boolean')layer.show=raw.show;if(typeof raw.protectTones==='boolean')layer.protectTones=raw.protectTones;if(['add','subtract','intersect','difference'].includes(raw.combineMode))layer.combineMode=raw.combineMode;
     if(['all','shadows','midtones','highlights'].includes(raw.toneRange))layer.toneRange=raw.toneRange;if(['none','luminance','color'].includes(raw.rangeType))layer.rangeType=raw.rangeType;if(layer.rangeMin>layer.rangeMax)[layer.rangeMin,layer.rangeMax]=[layer.rangeMax,layer.rangeMin];layer.semantic=sanitizeSemanticMask(raw.semantic);if(!layer.purpose&&layer.type==='brush'&&layer.protectTones&&layer.toneRange==='midtones'){const legacyPurpose=layer.name.toLowerCase().startsWith('dodge')?'dodge':layer.name.toLowerCase().startsWith('burn')?'burn':'';if(legacyPurpose)layer.purpose=legacyPurpose}
     const available=Math.max(0,Math.min(MAX_MASK_STROKES,MAX_TOTAL_MASK_STROKES-strokeBudget.count)),pointAvailable=Math.max(0,Math.min(MAX_MASK_POINTS_PER_LAYER,MAX_TOTAL_MASK_POINTS-strokeBudget.points));layer.strokes=sanitizeMaskStrokes(raw.strokes,available,pointAvailable);layer.regions=sanitizeMaskRegions(raw.regions,strokeBudget);const layerPoints=layer.strokes.reduce((sum,stroke)=>sum+(stroke.kind==='path'?stroke.points.length:1),0);strokeBudget.count+=layer.strokes.length;strokeBudget.points+=layerPoints;return layer;
   }
@@ -208,13 +227,14 @@
     if(!raw||typeof raw!=='object')return false;const d=defaultMaskLayer({enabled:false});return!!(raw.enabled||raw.invert||(Array.isArray(raw.strokes)&&raw.strokes.length)||(raw.type&&raw.type!=='subject')||['x','y','size','range','feather','subjectExposure','subjectClarity','backgroundExposure','backgroundBlur','skyExposure','skyTemperature'].some(key=>raw[key]!=null&&Number(raw[key])!==d[key]));
   }
   function migrateMasks(old){
-    const used=new Set(),budget={count:0,points:0,regionPoints:0};let layers=[],activeId='';
+    const used=new Set(),budget={count:0,points:0,regionPoints:0,groups:0,leaves:0,depth:0};let layers=[],activeId='';
     if(old?.masks&&typeof old.masks==='object'&&Array.isArray(old.masks.layers)){
-      const sourceVersion=Number(old.version||4);layers=old.masks.layers.slice(0,MAX_MASK_LAYERS).map((raw,index)=>sanitizeMaskLayer(raw,index,used,budget,sourceVersion));activeId=String(old.masks.activeId||'').slice(0,64);
+      const sourceVersion=Number(old.version||4);layers=old.masks.layers.slice(0,MAX_MASK_LAYERS+MAX_MASK_GROUPS).flatMap((raw,index)=>{const value=sanitizeMaskLayer(raw,index,used,budget,sourceVersion);return value?[value]:[]});activeId=String(old.masks.activeId||'').slice(0,64);
     }else if(legacyMaskMeaningful(old?.mask)){
       const legacyVersion=Number(old.version||0),legacyType=old.mask.type==='sky'?'sky':'subject',raw={...old.mask,id:'legacy-mask',name:legacyType==='sky'?'Sky 1':'Object 1',type:legacyType,legacyShape:legacyVersion<4&&legacyType==='subject'?'ellipse-v2':'',protectTones:false};layers=[sanitizeMaskLayer(raw,0,used,budget,legacyVersion)];activeId=layers[0].id;
     }
-    if(!layers.some(layer=>layer.id===activeId))activeId=layers[0]?.id||'';return{activeId,layers};
+    const find=(nodes,id)=>{for(const node of nodes){if(node.id===id)return node;const nested=node.type==='group'?find(node.children||[],id):null;if(nested)return nested}return null};
+    if(!find(layers,activeId))activeId=layers[0]?.id||'';return{activeId,layers};
   }
   function migratedEdits(old){
     const fresh=defaultEdits();
@@ -390,6 +410,43 @@
 
   function transformMaskMap(maskMap,e){const canvas=transformAndCrop(maskMap.canvas,e),context=canvas.getContext('2d',{willReadFrequently:true}),rgba=context.getImageData(0,0,canvas.width,canvas.height).data,data=new Uint8ClampedArray(canvas.width*canvas.height);for(let index=0;index<data.length;index++)data[index]=rgba[index*4+3];return{data,width:canvas.width,height:canvas.height,canvas,nearest:maskMap.nearest}}
 
+  function findMaskNode(nodes,id){
+    for(const node of nodes||[]){if(node.id===id)return node;if(node.type==='group'){const nested=findMaskNode(node.children,id);if(nested)return nested}}
+    return null;
+  }
+  function releaseMaskMap(map){if(map?.canvas){map.canvas.width=map.canvas.height=1;map.canvas=null}}
+  function ensureMaskMapCanvas(map){
+    if(!map||map.canvas)return map?.canvas||null;
+    const canvas=makeCanvas(map.width,map.height),context=canvas.getContext('2d'),image=context.createImageData(map.width,map.height);
+    for(let index=0;index<map.data.length;index++){const offset=index*4;image.data[offset]=image.data[offset+1]=image.data[offset+2]=255;image.data[offset+3]=map.data[index]}
+    context.putImageData(image,0,0);map.canvas=canvas;return canvas;
+  }
+  function combineMaskValue(a,b,mode){
+    if(mode==='subtract')return a*(1-b);
+    if(mode==='intersect')return a*b;
+    if(mode==='difference')return Math.abs(a-b);
+    return a+b*(1-a);
+  }
+  function buildMaskNodeMap(node,oriented,frame,e){
+    if(!node?.enabled)return null;
+    if(node.type!=='group'){
+      const base=node.space==='source'?oriented:frame;
+      let map=buildMaskWeights(base,{...node,enabled:true},e);
+      if(map&&node.space==='source'){const sourceMap=map;map=transformMaskMap(sourceMap,e);if(sourceMap.canvas&&sourceMap.canvas!==map.canvas)releaseMaskMap(sourceMap)}
+      return map;
+    }
+    const children=(node.children||[]).filter(child=>child?.enabled),combineScale=Math.min(1,1024/Math.max(frame.width,frame.height)),width=Math.max(1,Math.round(frame.width*combineScale)),height=Math.max(1,Math.round(frame.height*combineScale)),data=new Uint8ClampedArray(width*height);let initialized=false;
+    for(const child of children){
+      const map=buildMaskNodeMap(child,oriented,frame,e);if(!map)continue;
+      const density=Math.max(0,Math.min(1,(Number(child.componentDensity)||0)/100)),mode=initialized&&node.groupKind!=='folder'?child.combineMode:'add';
+      for(let y=0,pixel=0;y<height;y++)for(let x=0;x<width;x++,pixel++){const a=data[pixel]/255,b=maskWeightAt(map,x,y,width,height)*density;data[pixel]=Math.round(combineMaskValue(a,b,mode)*255)}
+      initialized=true;releaseMaskMap(map);
+    }
+    if(!initialized)return null;
+    if(node.invert)for(let index=0;index<data.length;index++)data[index]=255-data[index];
+    return{data,width,height,canvas:null,nearest:false};
+  }
+
   function tonalMaskWeight(lum,range,protect){
     let weight=range==='shadows'?Math.pow(1-clamp(lum),2):range==='highlights'?Math.pow(clamp(lum),2):range==='midtones'?Math.pow(clamp(1-Math.abs(lum-.5)*2),1.5):1;if(protect)weight*=.3+.7*clamp(1-Math.abs(lum-.5)*1.25);return weight;
   }
@@ -503,44 +560,45 @@
     })}
   }
   function render(image,edits,{maxEdge=1500,watermark='',visualizeMask=false,maskOnly=''}={}){
-    const e=migratedEdits(edits),oriented=orientedSource(image,e,maxEdge),canvas=transformAndCrop(oriented,e),active=e.masks.layers.find(layer=>layer.id===e.masks.activeId),entries=[];
+    const e=migratedEdits(edits),oriented=orientedSource(image,e,maxEdge),canvas=transformAndCrop(oriented,e),active=findMaskNode(e.masks.layers,e.masks.activeId),entries=[];
     if(maskOnly){
-      const layer=e.masks.layers.find(candidate=>candidate.id===maskOnly);
+      const layer=findMaskNode(e.masks.layers,maskOnly);
       if(layer){
-        let map=buildMaskWeights(layer.space==='source'?oriented:canvas,{...layer,enabled:true},e);
-        if(map&&layer.space==='source')map=transformMaskMap(map,e);
+        const map=buildMaskNodeMap({...layer,enabled:true},oriented,canvas,e);
+        if(!map)return canvas;
         const context=canvas.getContext('2d',{willReadFrequently:true}),image2=context.createImageData(canvas.width,canvas.height);
         for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++){const value=Math.round(maskWeightAt(map,x,y,canvas.width,canvas.height)*255),offset=(y*canvas.width+x)*4;image2.data[offset]=image2.data[offset+1]=image2.data[offset+2]=value;image2.data[offset+3]=255}
         context.putImageData(image2,0,0);
-        if(map?.canvas){map.canvas.width=map.canvas.height=1}
+        releaseMaskMap(map);
         return canvas;
       }
     }
-    for(const layer of [...e.masks.layers].reverse()){
-      const overlay=visualizeMask&&active===layer&&layer.show;if(!layer.enabled&&!overlay)continue;if(!layerHasEffect(layer)&&!overlay)continue;let map=buildMaskWeights(layer.space==='source'?oriented:canvas,layer,e);if(map&&layer.space==='source'){const sourceMap=map;map=transformMaskMap(sourceMap,e);if(sourceMap.canvas&&sourceMap.canvas!==map.canvas)sourceMap.canvas.width=sourceMap.canvas.height=1}if(map){if(!layer.backgroundBlur&&!layer.localBlur&&map.canvas){map.canvas.width=map.canvas.height=1;map.canvas=null}entries.push({layer,map})}
-    }
+    const collect=(nodes,opacityScale=1)=>{for(const node of [...(nodes||[])].reverse()){
+      if(node.type==='group'&&node.groupKind==='folder'){if(node.enabled)collect(node.children,opacityScale*node.opacity/100);continue}
+      if(!node.enabled||!layerHasEffect(node))continue;const map=buildMaskNodeMap(node,oriented,canvas,e);if(!map)continue;const layer=opacityScale===1?node:{...node,opacity:Math.max(0,Math.min(100,node.opacity*opacityScale))};if(layer.backgroundBlur||layer.localBlur)ensureMaskMapCanvas(map);else releaseMaskMap(map);entries.push({layer,map,node})
+    }};
+    collect(e.masks.layers);
     applyPixels(canvas,e,[]);applyDetail(canvas,e);
     const effectEntries=entries.filter(entry=>entry.layer.enabled&&layerHasEffect(entry.layer));let segment=[];
     for(const entry of effectEntries){segment.push(entry);if(entry.layer.backgroundBlur||entry.layer.localBlur){applyLocalPixels(canvas,segment);segment=[];applyLayerBlur(canvas,entry)}}
     applyLocalPixels(canvas,segment);applyCleanup(canvas,cleanupForOutput(image,e));
-    const overlayEntry=entries.find(entry=>entry.layer===active);if(visualizeMask&&active?.show&&overlayEntry)applyMaskOverlay(canvas,overlayEntry.map);addWatermark(canvas,watermark);applyCropShape(canvas,e);for(const entry of entries)if(entry.map.canvas){entry.map.canvas.width=entry.map.canvas.height=1}return canvas
+    let overlayMap=null;if(visualizeMask&&active?.show)overlayMap=buildMaskNodeMap({...active,enabled:true},oriented,canvas,e);if(overlayMap)applyMaskOverlay(canvas,overlayMap);addWatermark(canvas,watermark);applyCropShape(canvas,e);for(const entry of entries)releaseMaskMap(entry.map);releaseMaskMap(overlayMap);return canvas
   }
 
   function maskThumbnail(image,edits,layerId,maxEdge=56){
-    const e=migratedEdits(edits),layer=e.masks.layers.find(candidate=>candidate.id===layerId);
+    const e=migratedEdits(edits),layer=findMaskNode(e.masks.layers,layerId);
     if(!layer)return null;
     const working=clone(layer);working.enabled=true;
     const buildEdge=Math.min(224,Math.max(96,maxEdge*4)),oriented=orientedSource(image,e,buildEdge);
-    const base=working.space==='source'?oriented:transformAndCrop(oriented,e);
-    let map=buildMaskWeights(base,working,e);
+    const frame=transformAndCrop(oriented,e);
+    const map=buildMaskNodeMap(working,oriented,frame,e);
     if(!map)return null;
-    if(working.space==='source')map=transformMaskMap(map,e);
     const scale=Math.min(1,maxEdge/Math.max(map.width,map.height)),outWidth=Math.max(1,Math.round(map.width*scale)),outHeight=Math.max(1,Math.round(map.height*scale));
     const source=makeCanvas(map.width,map.height),sourceContext=source.getContext('2d'),image2=sourceContext.createImageData(map.width,map.height);
     for(let index=0;index<map.data.length;index++){const value=map.data[index],offset=index*4;image2.data[offset]=image2.data[offset+1]=image2.data[offset+2]=value;image2.data[offset+3]=255}
     sourceContext.putImageData(image2,0,0);
     const out=makeCanvas(outWidth,outHeight),outContext=out.getContext('2d');outContext.imageSmoothingQuality='high';outContext.drawImage(source,0,0,outWidth,outHeight);
-    source.width=source.height=1;if(map.canvas){map.canvas.width=map.canvas.height=1}
+    source.width=source.height=1;releaseMaskMap(map);
     return out;
   }
 

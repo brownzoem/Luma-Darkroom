@@ -112,6 +112,101 @@ const check = (condition, message, detail) => {
   });
   check(Math.abs(square.ratio - 1) < 0.02, 'aspect preset locks crop to 1:1', square);
 
+  // Swapping a locked crop orientation is a stable two-state toggle. It must
+  // not repeatedly fit the new ratio inside the already-shrunken rectangle.
+  await page.keyboard.press('c');
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { LumaCropTool.setRect(0.08, 0.12, 0.92, 0.88); LumaCropTool.setAspect('3 : 2'); });
+  const readOrientation = () => page.evaluate(() => {
+    const state = LumaCropTool.state, rect = state.rect, geometry = current.edits.geometry;
+    const rotation = ((geometry.rotation90 % 360) + 360) % 360, rotated = rotation === 90 || rotation === 270;
+    const frameWidth = rotated ? sourceImage.naturalHeight : sourceImage.naturalWidth;
+    const frameHeight = rotated ? sourceImage.naturalWidth : sourceImage.naturalHeight;
+    const width = (rect.r - rect.l) * frameWidth, height = (rect.b - rect.t) * frameHeight;
+    return { rect: [rect.l, rect.t, rect.r, rect.b], ratio: state.ratio, label: state.ratioLabel, width, height, area: width * height };
+  });
+  const orientationStates = [await readOrientation()];
+  await page.locator('[title="Swap crop orientation (X)"]').click();
+  orientationStates.push(await readOrientation());
+  for (let index = 0; index < 10; index++) { await page.keyboard.press('x'); orientationStates.push(await readOrientation()); }
+  const closeRect = (a, b) => a.every((value, index) => Math.abs(value - b[index]) < 1e-8);
+  const stableOrientation = orientationStates.every((state, index) => closeRect(state.rect, orientationStates[index % 2].rect));
+  const correctRatios = orientationStates.every((state, index) => Math.abs(state.ratio - (index % 2 ? 2 / 3 : 3 / 2)) < 1e-8 && state.label === (index % 2 ? '2 : 3' : '3 : 2'));
+  check(stableOrientation, 'repeated crop orientation swaps do not progressively shrink', orientationStates);
+  check(correctRatios, 'crop orientation swap updates and alternates the locked aspect', orientationStates);
+  await page.evaluate(() => { LumaCropTool.setRect(0.3, 0.3, 0.7, 0.7); LumaCropTool.setAspect('4 : 5'); });
+  const areaBeforeSwap = await readOrientation();
+  await page.keyboard.press('x');
+  const areaAfterSwap = await readOrientation();
+  await page.keyboard.press('x');
+  const areaAfterRoundTrip = await readOrientation();
+  const center = state => [(state.rect[0] + state.rect[2]) / 2, (state.rect[1] + state.rect[3]) / 2];
+  const centerBefore = center(areaBeforeSwap), centerAfter = center(areaAfterSwap);
+  check(Math.abs(areaAfterSwap.area - areaBeforeSwap.area) < 1e-6 && Math.abs(centerAfter[0] - centerBefore[0]) < 1e-8 && Math.abs(centerAfter[1] - centerBefore[1]) < 1e-8, 'crop orientation swap preserves area and center when both orientations fit', { areaBeforeSwap, areaAfterSwap });
+  check(closeRect(areaAfterRoundTrip.rect, areaBeforeSwap.rect) && areaAfterSwap.label === '5 : 4' && areaAfterRoundTrip.label === '4 : 5', 'two crop orientation swaps restore the exact starting rectangle and label', { areaBeforeSwap, areaAfterSwap, areaAfterRoundTrip });
+
+  // The dimmed margin is still part of the photograph. Starting a normal drag
+  // there must pan the photo and remain a pan after crossing into the crop; it
+  // must never become the old implicit straighten gesture.
+  await page.evaluate(() => {
+    LumaCropTool.setRect(0.3, 0.25, 0.7, 0.75);
+    Object.assign(current.edits.geometry, { straighten: 7.5, xOffset: 0, yOffset: 0 });
+    scheduleRender();
+  });
+  await page.waitForTimeout(200);
+  const cropCanvasBox = await page.locator('#canvas').boundingBox();
+  const cropPoint = (fx, fy) => ({ x: cropCanvasBox.x + cropCanvasBox.width * fx, y: cropCanvasBox.y + cropCanvasBox.height * fy });
+  const marginDragStart = cropPoint(0.12, 0.36), marginDragEnd = cropPoint(0.44, 0.58);
+  const marginCursorBefore = await page.evaluate(() => getComputedStyle(document.querySelector('#canvas')).cursor);
+  await page.mouse.move(marginDragStart.x, marginDragStart.y);
+  await page.mouse.down();
+  const marginGesture = await page.evaluate(() => ({
+    kind: LumaCropTool.state.gesture?.kind,
+    part: LumaCropTool.state.gesture?.part,
+    cursor: getComputedStyle(document.querySelector('#canvas')).cursor
+  }));
+  await page.mouse.move(marginDragEnd.x, marginDragEnd.y, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  const marginPan = await page.evaluate(() => ({
+    straighten: current.edits.geometry.straighten,
+    xOffset: current.edits.geometry.xOffset,
+    yOffset: current.edits.geometry.yOffset,
+    rect: { ...LumaCropTool.state.rect },
+    gesture: LumaCropTool.state.gesture,
+    cursor: getComputedStyle(document.querySelector('#canvas')).cursor
+  }));
+  check(marginGesture.kind === 'photo' && marginGesture.part === 'photo-pan', 'dimmed photo margin starts a pan gesture', marginGesture);
+  check(marginCursorBefore === 'grab' && marginGesture.cursor === 'grabbing' && marginPan.cursor === 'grab', 'crop cursor communicates grab and active panning', { marginCursorBefore, marginGesture, marginPan });
+  check(Math.abs(marginPan.straighten - 7.5) < 1e-8, 'dragging the photo outside a smaller crop does not rotate it', marginPan);
+  check(Math.abs(marginPan.xOffset) > 1e-4 || Math.abs(marginPan.yOffset) > 1e-4, 'dragging the dimmed photo margin pans the photo', marginPan);
+  check(closeRect(Object.values(marginPan.rect), [0.3, 0.25, 0.7, 0.75]) && marginPan.gesture === null, 'margin pan leaves the crop rectangle fixed and finishes cleanly', marginPan);
+
+  // Canceling while the pointer is still down must release the fast canvas
+  // preview as well as restoring the entry snapshot. A later pointerup must be
+  // harmless instead of leaving a stale gesture or grabbing cursor behind.
+  const interruptedStart = cropPoint(0.14, 0.38), interruptedEnd = cropPoint(0.2, 0.42);
+  await page.mouse.move(interruptedStart.x, interruptedStart.y);
+  await page.mouse.down();
+  await page.evaluate(() => {
+    window.__interruptedCropGesture = LumaCropTool.state.gesture;
+    window.__cropEntrySnapshot = JSON.stringify(LumaCropTool.state.snapshot);
+  });
+  await page.mouse.move(interruptedEnd.x, interruptedEnd.y, { steps: 3 });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(100);
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  const interruptedPan = await page.evaluate(() => ({
+    active: LumaCropTool.isActive(),
+    gesture: LumaCropTool.state.gesture,
+    warp: window.__interruptedCropGesture?.warp,
+    restored: JSON.stringify(current.edits) === window.__cropEntrySnapshot,
+    grabbing: document.querySelector('.canvas-wrap')?.classList.contains('panning')
+  }));
+  check(!interruptedPan.active && interruptedPan.gesture === null && interruptedPan.warp === null, 'Esc during a margin pan releases the gesture and canvas warp', interruptedPan);
+  check(interruptedPan.restored && !interruptedPan.grabbing, 'Esc during a margin pan restores edits and clears the grabbing cursor', interruptedPan);
+
   // Shape crop renders transparency; Esc cancel restores exactly.
   const beforeShape = await page.evaluate(() => JSON.stringify(current.edits));
   await page.keyboard.press('c');

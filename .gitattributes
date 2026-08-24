@@ -12,3 +12,7 @@
 *.tif binary
 *.tiff binary
 *.exe binary
+
+# Preserve canonical upstream license bytes, including intentional final blanks.
+third_party/AOM-LICENSE.txt whitespace=-blank-at-eof
+third_party/AOM-PATENTS.txt whitespace=-blank-at-eof

@@ -31,19 +31,25 @@ Project website and user guide: <https://lumadarkroom.com>
   range intersections. Drawing never multiplies layers: a fresh drag
   replaces the active selection's shape (its adjustments stay), and new
   layers come only from the ＋ Add mask dropdown or the ＋ New layer button.
-- A pro-style mask layers panel: each row shows a live grayscale thumbnail
-  of its mask, its name and type, drag-and-drop reordering, double-click
-  (or F2) inline renaming, and a ⋯ / right-click menu with Rename,
-  Duplicate, Invert, Disable, Move, and Delete. Alt+click a thumbnail to
-  view the mask itself in grayscale on the canvas; Shift+click disables it.
-- A non-destructive stack of up to eight independent subject, object, people,
+- An editable mask tree: every row has a live grayscale thumbnail, visibility,
+  density, inline rename, drag reorder, and a complete overflow/context menu.
+  Click chooses one primary target; Ctrl/Cmd-click toggles non-contiguous rows
+  and Shift-click selects a range. Selected siblings can be placed in a
+  collapsible folder or combined non-destructively with Add, Subtract,
+  Intersect, or Difference. Components remain independently editable and can
+  be detached or ungrouped; deep duplication refreshes every internal ID.
+  Alt-click a thumbnail views that mask itself in grayscale on the canvas.
+- A non-destructive tree of up to eight subject, object, people,
   background, sky, brush, linear-gradient, radial-gradient, range, and
-  geometry-selection masks.
-  Layers can be reordered,
+  geometry-selection masks, with up to eight groups and four tree levels.
+  Masks can be reordered,
   renamed, hidden, inverted, duplicated, refined with add/subtract brushes,
-  and blended with per-mask opacity.
+  and blended with per-mask density. Folder Group preserves each mask's local
+  adjustments; Combine uses the primary mask's adjustments once through the
+  editable composite and retains every component for Ungroup and Undo.
 - An interactive crop tool with drag handles, aspect presets and lock,
-  drag-to-straighten, cycling guide overlays, and preset crop shapes (oval,
+  reversible orientation swapping, precise straighten controls, cycling guide overlays,
+  and preset crop shapes (oval,
   star, heart, polygons, arrow, or the outline of the active selection) with
   feathered edges. While cropping, drag the photo to reposition it under the
   crop, drag its corners to zoom, and drag its edges to stretch — all
@@ -57,9 +63,15 @@ Project website and user guide: <https://lumadarkroom.com>
   brush shortcuts, and crop-consistent brush sizing for pointer and keyboard
   workflows.
 - Curated color, portrait, landscape, cinematic, film, black-and-white, and
-  dynamic-range-look presets plus searchable custom presets with an amount
-  control. Custom presets autosave locally and can be renamed, deleted, or
-  moved between computers with validated JSON export/import.
+  dynamic-range-look presets plus searchable custom presets gathered in a
+  dedicated Custom category whenever any are saved, with an amount control. An
+  applied preset can be removed from the current photo to restore
+  its exact pre-preset settings, with Undo available. Removal stays available
+  while the preset is active; after a later manual adjustment, use Undo so that
+  adjustment is not silently discarded. Custom presets autosave locally and
+  their saved recipes can be renamed, deleted, or moved between
+  computers with validated JSON export/import; deleting a recipe never changes
+  a photo where its look is already applied.
 - Before/original comparison, two-photo comparison, a filmstrip, zoom, rotate,
   flip, and edit history.
 - JPEG, PNG, WebP, and TIFF export, original-file copy, size and quality
@@ -104,8 +116,11 @@ In the Develop view, single letters select editing tools; culling letters
 | Close a polygon or pen path / remove last point | Enter or double-click / Backspace |
 | Deselect / reselect / invert the active mask | Ctrl + D / Ctrl + Shift + D / Ctrl + Shift + I |
 | Rename the selected mask layer | Double-click its row, or F2 |
-| View mask in grayscale / disable mask | Alt + click / Shift + click its thumbnail |
-| Select all | Ctrl + A |
+| View a mask in grayscale | Alt + click its thumbnail |
+| Toggle / range-select mask rows | Ctrl or Cmd + click / Shift + click |
+| Select sibling mask rows | Ctrl or Cmd + A while a mask row is focused |
+| Duplicate / group selected masks | Ctrl or Cmd + J / Ctrl or Cmd + G |
+| Delete selected masks | Delete or Backspace |
 | Crop: apply / cancel / cycle guides / swap aspect | Enter / Esc / O / X |
 | Previous / next photograph | Left / Right |
 | Set rating | 1–5 |
@@ -127,6 +142,8 @@ In the Develop view, single letters select editing tools; culling letters
 | Zoom in / out / Fit | Ctrl + + / Ctrl + - / Ctrl + 0 |
 | Zoom at the cursor | Ctrl + scroll wheel (pinch on trackpads) |
 | Copy / paste develop settings between photos | Ctrl + Shift + C / Ctrl + Shift + V |
+| Enter an exact slider value | Click the number beside the slider; Enter commits, Esc restores |
+| Scrub a slider precisely | Middle-button drag horizontally; hold Shift for extra precision or Ctrl for faster movement |
 | Reset a single slider to its default | Double-click the slider or its label |
 | Add / select / move / delete a tone-curve point | Enter / Ctrl + Left or Right / Arrow keys / Delete |
 

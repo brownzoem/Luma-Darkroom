@@ -111,7 +111,7 @@ The tool layer. It loads after src/app.js, shares its global scope, and adds:
 
 The interactive crop mode, registered with the tool layer. While active the
 photo renders uncropped; the module owns the crop rectangle (handles, aspect
-lock, straighten-by-dragging-outside, guide overlays), shape crops
+lock, explicit precision straighten controls, guide overlays), shape crops
 (parametric shapes or the active selection outline, with feather), and the
 photo transform under the crop (drag to pan, corner handles zoom, edge
 handles stretch). Apply writes `geometry.cropL/T/R/B` plus the `cropShape*`
@@ -131,6 +131,14 @@ The engine is a browser-global module. It provides:
 - geometry mask regions: polygon, cubic-curve, parametric-shape, and
   magic-wand regions rasterized with add/subtract/intersect compositing
   inside the bounded mask pipeline;
+- a version-9 editable mask tree with bounded folders and composite groups.
+  Composite children evaluate in order with alpha Add, Subtract, Intersect,
+  or Difference operations; every source/frame-space child is normalized to
+  the output frame before composition. Folder groups keep child adjustments
+  independent, while a combined group applies its primary target's local
+  adjustment once through the composed coverage. Component density is stored
+  independently from the preserved standalone adjustment opacity, so grouping
+  and ungrouping do not silently change a mask's original strength;
 - image-quality analysis.
 
 It accepts an already decoded image plus edit state and returns a canvas.
@@ -200,8 +208,11 @@ Edits are nested, versioned, non-destructive instructions:
 - optics toggles and manual corrections;
 - rotation, flip, straighten, perspective-like transforms, aspect, scale,
   offsets, and crop zoom/position;
-- up to eight ordered local-mask layers with bounded compact brush paths and
-  points, plus a bounded source-anchored retouch list.
+- up to eight local-mask leaves in an ordered tree of at most eight groups and
+  four levels, with bounded compact brush paths and points, plus a bounded
+  source-anchored retouch list. IDs are sanitized globally across the tree;
+  recursive migration shares the same aggregate stroke, point, region, group,
+  and leaf budgets so nesting cannot bypass resource limits.
 
 Interactive preview requests use a capped draft long edge and then settle at a
 zoom-, viewport-, and display-density-aware edge between 1050 and 3200 pixels.

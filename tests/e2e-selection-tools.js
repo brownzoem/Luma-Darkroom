@@ -129,6 +129,44 @@ const check = (condition, message, detail) => {
   layers = await layerSummary();
   check(layers.length === 2 && layers[0].regions.length === 1 && layers[0].regions[0]?.kind === 'polygon', 'polygonal lasso replaces without adding layers', layers);
 
+  mark('cancel-unfinished-pen');
+  // Switching tools must discard an unfinished multi-click path and its
+  // cursor-connected preview without changing the committed selection.
+  await page.keyboard.press('p');
+  for (const [fx, fy] of [[0.18, 0.7], [0.3, 0.62]]) {
+    const point = at(fx, fy);
+    await page.mouse.click(point.x, point.y);
+  }
+  const penHover = at(0.46, 0.78);
+  await page.mouse.move(penHover.x, penHover.y, { steps: 4 });
+  const unfinishedPen = await page.evaluate(() => ({
+    tool: toolMode,
+    pendingKind: LumaToolRail.state.pending?.kind,
+    points: LumaToolRail.state.pending?.points.length,
+    hasHover: !!LumaToolRail.state.pending?.hover,
+  }));
+  check(unfinishedPen.tool === 'tool-pen' && unfinishedPen.pendingKind === 'pen' && unfinishedPen.points === 2 && unfinishedPen.hasHover, 'unfinished pen path exposes its live preview state', unfinishedPen);
+  await page.locator('.tool-rail-btn[data-tool-id="pen"]').click();
+  const samePen = await page.evaluate(() => ({ tool: toolMode, pendingKind: LumaToolRail.state.pending?.kind, points: LumaToolRail.state.pending?.points.length }));
+  check(samePen.tool === 'tool-pen' && samePen.pendingKind === 'pen' && samePen.points === 2, 'reselecting the active Pen keeps its in-progress path', samePen);
+  await page.locator('.tool-rail-btn[data-tool-id="wand"]').click();
+  await page.mouse.move(penHover.x + 20, penHover.y + 10);
+  const canceledPen = await page.evaluate(() => ({
+    tool: toolMode,
+    pending: LumaToolRail.state.pending,
+    gesture: LumaToolRail.state.gesture,
+    wandPressed: document.querySelector('.tool-rail-btn[data-tool-id="wand"]')?.getAttribute('aria-pressed'),
+  }));
+  check(canceledPen.tool === 'tool-wand' && canceledPen.pending === null && canceledPen.gesture === null && canceledPen.wandPressed === 'true', 'switching to Wand cancels the unfinished pen path and activates only Wand', canceledPen);
+  await page.keyboard.press('Enter');
+  const afterCanceledEnter = await layerSummary();
+  check(afterCanceledEnter.length === 2 && afterCanceledEnter[0].regions[0]?.kind === 'polygon', 'Enter cannot commit an abandoned Pen path after switching tools', afterCanceledEnter);
+  const canceledWandPoint = at(0.52, 0.24);
+  await page.mouse.click(canceledWandPoint.x, canceledWandPoint.y);
+  await page.waitForTimeout(150);
+  layers = await layerSummary();
+  check(layers.length === 2 && layers[0].regions.length === 1 && layers[0].regions[0]?.kind === 'wand', 'the first click after cancel belongs to the newly selected Wand tool', layers);
+
   mark('pen');
   // Pen path with Enter close — replaces again.
   await page.keyboard.press('p');
@@ -211,7 +249,7 @@ const check = (condition, message, detail) => {
   check(await page.evaluate(() => toolMode) === '', 'Escape clears the tool');
 
   mark('panel');
-  // --- Photoshop-style layers panel ----------------------------------------
+  // --- Familiar mask-layers panel ------------------------------------------
   const panelRows = await page.evaluate(() => ({
     rows: document.querySelectorAll('#maskList .mask-row').length,
     thumbs: document.querySelectorAll('#maskList .mask-thumb img').length,
@@ -250,11 +288,16 @@ const check = (condition, message, detail) => {
   check(afterOrder[0] === beforeOrder[1] && afterOrder[1] === beforeOrder[0], 'drag reorders the mask stack', { beforeOrder, afterOrder });
 
   mark('thumb-mods');
-  await page.locator('#maskList .mask-row.active .mask-thumb').click({ modifiers: ['Shift'] });
+  await page.locator('#maskList .mask-row').first().click();
+  await page.locator('#maskList .mask-row').last().locator('.mask-thumb').click({ modifiers: ['Shift'] });
   await page.waitForTimeout(200);
-  check(await page.evaluate(() => activeMask().enabled) === false, 'Shift+click thumbnail disables the mask');
-  await page.locator('#maskList .mask-row.active .mask-thumb').click({ modifiers: ['Shift'] });
+  const rangeSelection = await page.evaluate(() => ({ selected: [...maskSelectedIds], anchor: maskSelectionAnchorId, active: current.edits.masks.activeId, rows: [...document.querySelectorAll('#maskList .mask-row')].map(row => ({ id: row.dataset.maskId, selected: row.getAttribute('aria-selected') })) }));
+  check(rangeSelection.selected.length === rangeSelection.rows.length && rangeSelection.selected.length >= 2 && rangeSelection.rows.every(row => row.selected === 'true'), 'Shift+click thumbnail selects a contiguous mask range', rangeSelection);
+  check(await page.evaluate(() => activeMask().enabled) === true, 'range selection does not change mask visibility');
+  await page.locator('#maskList .mask-row.active .mask-eye').click();
   await page.waitForTimeout(200);
+  check(await page.evaluate(() => activeMask().enabled) === false, 'eye control disables the active mask');
+  await page.locator('#maskList .mask-row.active .mask-eye').click();
   await page.locator('#maskList .mask-row.active .mask-thumb').click({ modifiers: ['Alt'] });
   await page.waitForFunction(() => !previewWorkerPreparing && !previewWorkerBusy && !previewWorkerPending && canvas.dataset.previewQuality === 'full', null, { timeout: 20000 });
   const maskViewState = await page.evaluate(() => {

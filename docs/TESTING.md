@@ -48,6 +48,10 @@ The suite includes:
 - a keyboard-accessibility pass covering object selection, brush refinements,
   two-step gradients, heal/clone/red-eye, color sampling, tone-curve editing,
   focus feedback, and content reachability at 400% application zoom;
+- a precision-control pass covering exact decimal entry, validation and
+  clamping, Enter/Escape behavior, one-step undo, middle-button fine scrubbing,
+  stable preview layout, Help access while typing, modal shortcut containment,
+  and dynamic Zoom, Wand, and Crop slider adapters;
 - an export-worker pass covering encoded-image validity, selected-photo
   targeting, event-loop responsiveness, cancellation, and worker cleanup.
 - a brush-workflow pass covering compact paths, coarse/coalesced and
@@ -58,8 +62,13 @@ The suite includes:
   with combine modifiers, magic wand, pen paths, Move/Transform pan and
   corner zoom, geometry-mask rendering, undo/redo storms, and the
   deselect/invert shortcuts;
-- a crop-and-transform pass covering crop handles, aspect lock, shape crops
-  with verified alpha output, exact Esc-cancel restoration, catalog reload
+- a mask-tree pass covering hostile recursive migration, global ID and depth
+  budgets, Ctrl/Cmd and Shift multi-selection, exact Add/Subtract/Intersect/
+  Difference pixels, ARIA tree state, nested folders, collapse, deep duplicate,
+  ungroup, bulk delete with one-step Undo, localized adjustments, and exact
+  preview/export parity;
+- a crop-and-transform pass covering crop handles, aspect lock, stable repeated
+  orientation swaps, margin-pan hit testing, shape crops with verified alpha output, exact Esc-cancel restoration, catalog reload
   persistence, rotate/flip coordinate round-trips, hostile-region
   sanitization, mask-layer limits, degenerate gestures, and exact
   preview/export worker parity.

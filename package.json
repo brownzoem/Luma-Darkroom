@@ -54,11 +54,11 @@
     "dist": "electron-builder --win nsis --x64"
   },
   "devDependencies": {
-    "@electron/asar": "^3.4.1",
-    "electron": "^43.4.0",
+    "@electron/asar": "^4.3.0",
+    "electron": "^44.2.0",
     "electron-builder": "^26.0.12",
-    "eslint": "^9.39.5",
-    "playwright-core": "^1.62.1"
+    "eslint": "^10.10.0",
+    "playwright-core": "^1.63.0"
   },
   "build": {
     "appId": "com.luma.darkroom",
